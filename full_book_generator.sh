@@ -17,6 +17,8 @@ MAX_WORDS=2500
 WRITING_STYLE="detailed"
 TONE="professional"
 DELAY_BETWEEN_CHAPTERS=30  # Seconds to avoid rate limits
+OUTLINE_ONLY=false
+CHAPTERS_ONLY=""
 
 show_help() {
     cat << EOF
@@ -50,50 +52,75 @@ EXAMPLES:
 EOF
 }
 
-# Parse arguments
-OUTLINE_ONLY=false
-CHAPTERS_ONLY=""
+# Debug, echo all passed parameters
+echo "Debug: Arguments passed: $@"
 
-while [[ $# -gt 0 ]]; do
-    case $1 in
+# Store all arguments for processing
+ALL_ARGS=("$@")
+TOPIC=""
+GENRE=""
+AUDIENCE=""
+ARGS_PROCESSED=0
+
+# First pass - handle all option flags
+i=0
+while [ $i -lt ${#ALL_ARGS[@]} ]; do
+    case ${ALL_ARGS[$i]} in
         -m|--model)
-            MODEL="$2"
-            shift 2
+            MODEL="${ALL_ARGS[$((i+1))]}"
+            ALL_ARGS[$i]="__PROCESSED__"
+            ALL_ARGS[$((i+1))]="__PROCESSED__"
+            i=$((i+2))
             ;;
         -t|--temperature)
-            TEMPERATURE="$2"
-            shift 2
+            TEMPERATURE="${ALL_ARGS[$((i+1))]}"
+            ALL_ARGS[$i]="__PROCESSED__"
+            ALL_ARGS[$((i+1))]="__PROCESSED__"
+            i=$((i+2))
             ;;
         --min-words)
-            MIN_WORDS="$2"
-            shift 2
+            MIN_WORDS="${ALL_ARGS[$((i+1))]}"
+            ALL_ARGS[$i]="__PROCESSED__"
+            ALL_ARGS[$((i+1))]="__PROCESSED__"
+            i=$((i+2))
             ;;
         --max-words)
-            MAX_WORDS="$2"
-            shift 2
+            MAX_WORDS="${ALL_ARGS[$((i+1))]}"
+            ALL_ARGS[$i]="__PROCESSED__"
+            ALL_ARGS[$((i+1))]="__PROCESSED__"
+            i=$((i+2))
             ;;
         --style)
-            WRITING_STYLE="$2"
-            shift 2
+            WRITING_STYLE="${ALL_ARGS[$((i+1))]}"
+            ALL_ARGS[$i]="__PROCESSED__"
+            ALL_ARGS[$((i+1))]="__PROCESSED__"
+            i=$((i+2))
             ;;
         --tone)
-            TONE="$2"
-            shift 2
+            TONE="${ALL_ARGS[$((i+1))]}"
+            ALL_ARGS[$i]="__PROCESSED__"
+            ALL_ARGS[$((i+1))]="__PROCESSED__"
+            i=$((i+2))
             ;;
         --delay)
-            DELAY_BETWEEN_CHAPTERS="$2"
-            shift 2
+            DELAY_BETWEEN_CHAPTERS="${ALL_ARGS[$((i+1))]}"
+            ALL_ARGS[$i]="__PROCESSED__"
+            ALL_ARGS[$((i+1))]="__PROCESSED__"
+            i=$((i+2))
             ;;
         --outline-only)
             OUTLINE_ONLY=true
-            shift
+            ALL_ARGS[$i]="__PROCESSED__"
+            i=$((i+1))
             ;;
         --chapters-only)
-            CHAPTERS_ONLY="$2"
-            shift 2
+            CHAPTERS_ONLY="${ALL_ARGS[$((i+1))]}"
+            ALL_ARGS[$i]="__PROCESSED__"
+            ALL_ARGS[$((i+1))]="__PROCESSED__"
+            i=$((i+2))
             ;;
         --preset)
-            case $2 in
+            case ${ALL_ARGS[$((i+1))]} in
                 creative)
                     TEMPERATURE=0.9
                     WRITING_STYLE="narrative"
@@ -115,22 +142,39 @@ while [[ $# -gt 0 ]]; do
                     TONE="authoritative"
                     ;;
             esac
-            shift 2
+            ALL_ARGS[$i]="__PROCESSED__"
+            ALL_ARGS[$((i+1))]="__PROCESSED__"
+            i=$((i+2))
             ;;
         -h|--help)
             show_help
             exit 0
             ;;
-        -*)
-            echo "Unknown option: $1"
+        -*|--*)
+            echo "Unknown option: ${ALL_ARGS[$i]}"
             exit 1
             ;;
         *)
-            break
+            i=$((i+1))
             ;;
     esac
 done
-echo "Debug: TOPIC='$TOPIC', GENRE='$GENRE', AUDIENCE='$AUDIENCE'"
+
+# Second pass - collect positional arguments
+for arg in "${ALL_ARGS[@]}"; do
+    if [ "$arg" != "__PROCESSED__" ]; then
+        if [ -z "$TOPIC" ]; then
+            TOPIC="$arg"
+        elif [ -z "$GENRE" ]; then
+            GENRE="$arg"
+        elif [ -z "$AUDIENCE" ]; then
+            AUDIENCE="$arg"
+        fi
+    fi
+done
+
+# Debugging output to verify OUTLINE_ONLY
+echo "Debug: OUTLINE_ONLY is set to: $OUTLINE_ONLY"
 # Validate API key
 if [ -z "$API_KEY" ]; then
     echo "❌ Error: GEMINI_API_KEY environment variable not set"
@@ -153,24 +197,20 @@ else
         show_help
         exit 1
     fi
-
-    TOPIC="$1"
-    GENRE="$2"  
-    AUDIENCE="$3"
-    
-    echo "🚀 Starting complete book generation workflow"
-    echo "📖 Topic: $TOPIC"
-    echo "📚 Genre: $GENRE"
-    echo "👥 Audience: $AUDIENCE"
-    echo ""
 fi
+    
+echo "🚀 Starting complete book generation workflow"
+echo "📖 Topic: $TOPIC"
+echo "📚 Genre: $GENRE"
+echo "👥 Audience: $AUDIENCE"
+echo ""
 
 # API configuration
 API_URL="https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent"
 
 # Utility functions
 escape_json() {
-    echo "$1" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g'
+    echo "$1" | sed -e 's/"/\\"/g' -e ':a' -e 'N' -e '$!ba' -e 's/\n/\\n/g'
 }
 
 make_api_request() {
@@ -270,7 +310,7 @@ Make sure chapter titles are specific and promise clear value to readers."
     "temperature": 0.7,
     "topK": 40,
     "topP": 0.95,
-    "maxOutputTokens": 16384
+    "maxOutputTokens": 100000
   }
 }
 EOF
@@ -278,7 +318,9 @@ EOF
 
     echo "🔄 Making API request for outline..."
     RESPONSE=$(make_api_request "$JSON_PAYLOAD")
+    
     if [ $? -ne 0 ]; then
+        echo "❌ API request failed. Exiting."
         exit 1
     fi
 
@@ -289,9 +331,9 @@ EOF
     OUTLINE_FILE="${OUTPUT_DIR}/book_outline_${TIMESTAMP}.md"
 
     echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text' > "$OUTLINE_FILE"
-    
     echo "✅ Outline generated and saved to: $OUTLINE_FILE"
     
+    # Check if outline only mode is enabled
     if [ "$OUTLINE_ONLY" = true ]; then
         echo "📄 Outline generation complete. Exiting as requested."
         exit 0

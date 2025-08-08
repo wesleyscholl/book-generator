@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book Generator</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <style>
+        body {
+            padding-top: 2rem;
+            padding-bottom: 2rem;
+        }
+        .form-section {
+            margin-bottom: 2rem;
+        }
+        #output-container {
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .progress-bar {
+            transition: width 0.3s;
+        }
+        .book-list-item {
+            cursor: pointer;
+        }
+        .book-list-item:hover {
+            background-color: #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="mb-4">AI Book Generator</h1>
+
+        <div class="row">
+            <!-- Left column: Book generation form -->
+            <div class="col-md-7">
+                <div class="card">
+                    <div class="card-header">
+                        <ul class="nav nav-tabs card-header-tabs" id="myTab" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="basic-tab" data-bs-toggle="tab" data-bs-target="#basic" type="button" role="tab" aria-controls="basic" aria-selected="true">Basic</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="advanced-tab" data-bs-toggle="tab" data-bs-target="#advanced" type="button" role="tab" aria-controls="advanced" aria-selected="false">Advanced</button>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="card-body">
+                        <form id="book-form">
+                            <div class="tab-content" id="myTabContent">
+                                <!-- Basic Options -->
+                                <div class="tab-pane fade show active" id="basic" role="tabpanel" aria-labelledby="basic-tab">
+                                    <div class="form-section">
+                                        <h3>Required Information</h3>
+                                        <div class="mb-3">
+                                            <label for="topic" class="form-label">Book Topic</label>
+                                            <input type="text" class="form-control" id="topic" name="topic" required placeholder="E.g., Personal Finance for Millennials">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="genre" class="form-label">Genre</label>
+                                            <input type="text" class="form-control" id="genre" name="genre" required placeholder="E.g., Self-Help, Fiction, Business">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="audience" class="form-label">Target Audience</label>
+                                            <input type="text" class="form-control" id="audience" name="audience" required placeholder="E.g., Young Adults 25-35">
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="form-section">
+                                        <h3>Generation Options</h3>
+                                        <div class="form-check mb-3">
+                                            <input class="form-check-input" type="checkbox" id="outline-only" name="outlineOnly">
+                                            <label class="form-check-label" for="outline-only">
+                                                Generate outline only (don't create chapters)
+                                            </label>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="preset" class="form-label">Preset Style</label>
+                                            <select class="form-select" id="preset" name="preset">
+                                                <option value="" selected>No preset (use defaults)</option>
+                                                <option value="creative">Creative (narrative, conversational)</option>
+                                                <option value="technical">Technical (detailed, professional)</option>
+                                                <option value="fiction">Fiction (narrative, engaging)</option>
+                                                <option value="business">Business (detailed, authoritative)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Advanced Options -->
+                                <div class="tab-pane fade" id="advanced" role="tabpanel" aria-labelledby="advanced-tab">
+                                    <div class="form-section">
+                                        <h3>Model Configuration</h3>
+                                        <div class="mb-3">
+                                            <label for="model" class="form-label">Gemini Model</label>
+                                            <select class="form-select" id="model" name="model">
+                                                <option value="gemini-1.5-flash-latest" selected>Gemini 1.5 Flash (faster)</option>
+                                                <option value="gemini-1.5-pro-latest">Gemini 1.5 Pro (higher quality)</option>
+                                            </select>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="temperature" class="form-label">Temperature (0.0-1.0)</label>
+                                            <input type="range" class="form-range" min="0" max="1" step="0.1" id="temperature" name="temperature" value="0.8">
+                                            <div class="d-flex justify-content-between">
+                                                <small>0.0 (Deterministic)</small>
+                                                <small>0.8 (Default)</small>
+                                                <small>1.0 (Creative)</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="form-section">
+                                        <h3>Content Configuration</h3>
+                                        <div class="mb-3">
+                                            <label for="min-words" class="form-label">Min Words per Chapter</label>
+                                            <input type="number" class="form-control" id="min-words" name="minWords" placeholder="2000">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="max-words" class="form-label">Max Words per Chapter</label>
+                                            <input type="number" class="form-control" id="max-words" name="maxWords" placeholder="2500">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="style" class="form-label">Writing Style</label>
+                                            <select class="form-select" id="style" name="style">
+                                                <option value="" selected>Default</option>
+                                                <option value="detailed">Detailed</option>
+                                                <option value="narrative">Narrative</option>
+                                                <option value="academic">Academic</option>
+                                            </select>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="tone" class="form-label">Tone</label>
+                                            <select class="form-select" id="tone" name="tone">
+                                                <option value="" selected>Default</option>
+                                                <option value="professional">Professional</option>
+                                                <option value="casual">Casual</option>
+                                                <option value="authoritative">Authoritative</option>
+                                                <option value="conversational">Conversational</option>
+                                                <option value="engaging">Engaging</option>
+                                            </select>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="delay" class="form-label">Delay Between Chapters (seconds)</label>
+                                            <input type="number" class="form-control" id="delay" name="delay" placeholder="30">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="d-grid gap-2 mt-4">
+                                <button type="submit" class="btn btn-primary" id="generate-btn">Generate Book</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <div class="progress" id="progress-container" style="display: none;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%" id="progress-bar"></div>
+                    </div>
+                    <div id="output-container" style="display: none;"></div>
+                </div>
+            </div>
+
+            <!-- Right column: Book list -->
+            <div class="col-md-5">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Generated Books</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-grid gap-2 mb-3">
+                            <button class="btn btn-outline-primary btn-sm" id="refresh-books-btn">
+                                <i class="bi bi-arrow-clockwise"></i> Refresh List
+                            </button>
+                        </div>
+                        <div id="book-list" class="list-group">
+                            <div class="text-center py-3" id="book-list-loading">Loading...</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Book Preview Modal -->
+                <div class="modal fade" id="bookPreviewModal" tabindex="-1" aria-labelledby="bookPreviewModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="bookPreviewModalLabel">Book Preview</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div id="book-content"></div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ace.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const bookForm = document.getElementById('book-form');
+            const generateBtn = document.getElementById('generate-btn');
+            const outputContainer = document.getElementById('output-container');
+            const progressContainer = document.getElementById('progress-container');
+            const progressBar = document.getElementById('progress-bar');
+            const refreshBooksBtn = document.getElementById('refresh-books-btn');
+            const bookList = document.getElementById('book-list');
+            const bookListLoading = document.getElementById('book-list-loading');
+            const bookPreviewModal = new bootstrap.Modal(document.getElementById('bookPreviewModal'));
+            const bookContent = document.getElementById('book-content');
+            
+            // Load book list on page load
+            loadBookList();
+            
+            // Form submission
+            bookForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                // Get form data
+                const formData = new FormData(bookForm);
+                const formDataObj = {};
+                
+                // Convert checkbox values to boolean
+                for (const [key, value] of formData.entries()) {
+                    if (key === 'outlineOnly') {
+                        formDataObj[key] = true;
+                    } else if (value !== '') {
+                        formDataObj[key] = value;
+                    }
+                }
+                
+                // UI updates
+                generateBtn.disabled = true;
+                generateBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Generating...';
+                outputContainer.style.display = 'block';
+                outputContainer.textContent = 'Starting book generation...\n';
+                progressContainer.style.display = 'block';
+                updateProgress(5);
+                
+                try {
+                    const response = await fetch('/api/generate-book', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(formDataObj)
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        outputContainer.textContent = data.output;
+                        updateProgress(100);
+                        
+                        // Refresh book list
+                        loadBookList();
+                    } else {
+                        outputContainer.textContent = `Error: ${data.error}\n\n${data.output}`;
+                        updateProgress(100, 'bg-danger');
+                    }
+                } catch (error) {
+                    outputContainer.textContent = `An error occurred: ${error.message}`;
+                    updateProgress(100, 'bg-danger');
+                } finally {
+                    generateBtn.disabled = false;
+                    generateBtn.textContent = 'Generate Book';
+                }
+            });
+            
+            // Refresh book list
+            refreshBooksBtn.addEventListener('click', () => {
+                loadBookList();
+            });
+            
+            // Function to load book list
+            async function loadBookList() {
+                bookListLoading.style.display = 'block';
+                bookList.innerHTML = '';
+                
+                try {
+                    const response = await fetch('/api/books');
+                    const data = await response.json();
+                    
+                    if (data.success && data.books.length > 0) {
+                        bookList.innerHTML = data.books.map(book => `
+                            <button class="list-group-item list-group-item-action book-list-item" data-filename="${book.filename}">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h6 class="mb-1">${book.filename}</h6>
+                                    <small>${book.date}</small>
+                                </div>
+                                <small class="text-muted">Click to view</small>
+                            </button>
+                        `).join('');
+                        
+                        // Add event listeners to book items
+                        document.querySelectorAll('.book-list-item').forEach(item => {
+                            item.addEventListener('click', () => {
+                                const filename = item.getAttribute('data-filename');
+                                loadBookContent(filename);
+                            });
+                        });
+                    } else {
+                        bookList.innerHTML = '<div class="text-center py-3">No books found</div>';
+                    }
+                } catch (error) {
+                    bookList.innerHTML = `<div class="text-center py-3 text-danger">Error loading books: ${error.message}</div>`;
+                } finally {
+                    bookListLoading.style.display = 'none';
+                }
+            }
+            
+            // Function to load book content
+            async function loadBookContent(filename) {
+                try {
+                    const response = await fetch(`/api/book/${filename}`);
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        // Use marked.js to render markdown
+                        bookContent.innerHTML = marked.parse(data.content);
+                        document.getElementById('bookPreviewModalLabel').textContent = filename;
+                        bookPreviewModal.show();
+                    } else {
+                        alert('Error loading book content');
+                    }
+                } catch (error) {
+                    alert(`Error: ${error.message}`);
+                }
+            }
+            
+            // Function to update progress bar
+            function updateProgress(percentage, className = 'bg-primary') {
+                progressBar.style.width = `${percentage}%`;
+                progressBar.setAttribute('aria-valuenow', percentage);
+                progressBar.className = `progress-bar progress-bar-striped progress-bar-animated ${className}`;
+            }
+        });
+    </script>
+</body>
+</html>
