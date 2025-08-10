@@ -388,11 +388,91 @@ generate_complete_book() {
     fi
 }
 
+# Function to generate complete book from suggestion (variables already set by suggest_topics)
+generate_complete_book_from_suggestion() {
+    echo ""
+    echo "🎯 Book Configuration:"
+    echo "   📖 Topic: $TOPIC"
+    echo "   📚 Genre: $GENRE"  
+    echo "   👥 Audience: $AUDIENCE"
+    echo "   🎨 Style: $STYLE"
+    echo "   🗣️ Tone: $TONE"
+    echo ""
+    
+    read -p "🚀 Generate this book? This will take 30-90 minutes. (y/N): " confirm
+    if [[ ! $confirm =~ ^[Yy]$ ]]; then
+        echo "❌ Generation cancelled"
+        return 1
+    fi
+    
+    echo ""
+    pulse_text "🚀 Starting complete book generation..."
+    countdown 3 "Beginning in"
+    echo "⏰ Started at: $(date)"
+
+    # Check if full_book_generator.sh exists
+    if [ ! -f "./full_book_generator.sh" ]; then
+        echo "❌ Error: full_book_generator.sh not found"
+        echo "Make sure all scripts are in the current directory"
+        return 1
+    fi
+    
+    # Run the full book generator with proper quoting
+    ./full_book_generator.sh "$TOPIC" "$GENRE" "$AUDIENCE" \
+        --style "$STYLE" \
+        --tone "$TONE" \
+        --delay 30
+    
+    if [ $? -eq 0 ]; then
+        echo ""
+        celebration "Book generation completed!"
+        echo "⏰ Finished at: $(date)"
+        echo ""
+        
+        # Ask about editing
+        read -p "✨ Run AI review and editing? (Y/n): " run_editing
+        if [[ ! $run_editing =~ ^[Nn]$ ]]; then
+            LATEST_DIR=$(ls -td ./book_outputs/book_outline_* 2>/dev/null | head -1)
+            if [ -n "$LATEST_DIR" ]; then
+                review_and_edit_book "$LATEST_DIR"
+            fi
+        fi
+        
+        read -p "📖 Compile into final manuscript now? (Y/n): " compile_now
+        if [[ ! $compile_now =~ ^[Nn]$ ]]; then
+            LATEST_DIR=$(ls -td ./book_outputs/book_outline_* 2>/dev/null | head -1)
+            if [ -n "$LATEST_DIR" ]; then
+                ./compile_book.sh "$LATEST_DIR"
+            fi
+        fi
+    else
+        echo "❌ Book generation failed"
+        return 1
+    fi
+}
+
 generate_outline_only() {
     if ! get_book_details; then
         return 1
     fi
     
+    echo ""
+    loading_dots 1 "Preparing outline generation"
+
+    # Run with proper quoting
+    ./full_book_generator.sh "$TOPIC" "$GENRE" "$AUDIENCE" \
+        --style "$STYLE" \
+        --tone "$TONE" \
+        --outline-only
+        
+    if [ $? -eq 0 ]; then
+        echo "✅ Outline generated successfully"
+        echo "Use option 3 to generate chapters from this outline"
+    fi
+}
+
+# Function to generate outline from suggestion (variables already set by suggest_topics)
+generate_outline_only_from_suggestion() {
     echo ""
     loading_dots 1 "Preparing outline generation"
 
@@ -753,9 +833,9 @@ compile_manuscript() {
     ./compile_book.sh "$SELECTED_DIR" "$FORMAT" "$version_choice"
 }
 
-# Enhance the suggest_topics function to include research-based criteria
+# Enhanced suggest_topics function that returns parameters for book generation
 suggest_topics() {
-    loading_dots 5 "➡️  📚 Fetching 5 research-based book suggestions"
+    loading_dots 5 "➡️  📚 Generating 5 book topic suggestions"
     CURRENT_DATE=$(date +"%B %Y")
     SUGGESTION_PROMPT="Search the internet, research and provide 5 detailed book suggestions based on the following criteria:
 - Topics and genres with demand and less saturation (e.g., from Kindle Direct Publishing trends).
@@ -764,42 +844,111 @@ suggest_topics() {
 - Topics with potential for creating additional books (series, bundles, etc.).
 - Topics that are easier to create (less research required) and have low competition in the (sub) genre.
 
-Each suggestion should include:
-- Topic/Title
-- Genre
-- Target Audience
-- Writing Style
-- Tone
+Each suggestion MUST include these details in a structured format for EACH book:
+1. Topic/Title
+2. Genre
+3. Target Audience
+4. Writing Style (one of: detailed, narrative, academic, analytical, descriptive, persuasive, expository, technical)
+5. Tone (one of: professional, conversational, authoritative, casual, persuasive, humorous, inspirational, empathetic, bold)
 
-Important:Return just the list of 5 book topics, without markdown formatting or any other text. Don't include explanations or additional information, just return the list of topics 1-5."
+Important: Format your response as a numbered list 1-5, with each book having clear Title, Genre, Target Audience, Style and Tone. Do NOT include any introduction or conclusion text."
     ESCAPED_SUGGESTION_PROMPT=$(escape_json "$SUGGESTION_PROMPT")
     SUGGESTION_JSON_PAYLOAD='{"contents":[{"parts":[{"text":"'"$ESCAPED_SUGGESTION_PROMPT"'"}]}],"generationConfig":{"temperature":0.7,"topK":40,"topP":0.95,"maxOutputTokens":1500}}'
     RESPONSE=$(make_api_request "$SUGGESTION_JSON_PAYLOAD")
 
     if [ $? -ne 0 ]; then
         echo "❌ Failed to fetch suggestions. Please try again."
-        return
+        return 1
     fi
 
-    echo "✅ Suggestions received:"
-    # Clear the entire terminal
+    # Clean the response, only show the text from first numbered option through the end of the 5th suggestion
+    RES=$(echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text')
+    
+    # Create a clean version with just the 5 suggestions and no extra text
+    # First, create a temporary file with the original content
+    TMP_FILE=$(mktemp)
+    echo "$RES" > "$TMP_FILE"
+    
+    # Extract only the 5 book suggestions
+    CLEAN_SUGGESTIONS=""
+    for i in {1..5}; do
+        # Extract each numbered suggestion
+        if [ $i -lt 5 ]; then
+            # For suggestions 1-4, get everything between current number and next number
+            SUGGESTION=$(sed -n "/^$i\./,/^$((i+1))\./p" "$TMP_FILE" | sed "/^$((i+1))\./d")
+        else
+            # For suggestion 5, get everything until we find a blank line followed by text that's not part of the suggestion
+            SUGGESTION=$(sed -n "/^$i\./,/^$/p" "$TMP_FILE")
+            # If we didn't find a blank line, just take 10 lines after the "5." to get the content
+            if [ -z "$SUGGESTION" ]; then
+                START_LINE=$(grep -n "^$i\." "$TMP_FILE" | cut -d':' -f1)
+                END_LINE=$((START_LINE + 10))
+                SUGGESTION=$(sed -n "${START_LINE},${END_LINE}p" "$TMP_FILE")
+            fi
+        fi
+        CLEAN_SUGGESTIONS="${CLEAN_SUGGESTIONS}${SUGGESTION}"
+    done
+    
+    # Clean up
+    rm "$TMP_FILE"
+    
+    # Use the clean suggestions
+    RES="$CLEAN_SUGGESTIONS"
+    
+    # Strip all markdown formatting - including all asterisks (*)
+    SUGGESTIONS=$(echo "$RES" | sed 's/^[-*] //g; s/\*//g; s/^# //g; s/^## //g; s/^### //g;')
+    
+    # Clear the terminal and show suggestions
     clear
-    # Clean the response, only show the text starting from the first numbered option (e.g., 1.)
-    # RES=$(echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text' | sed -n '/^1\./,$p')
-
-    # Strip all markdown formatting - including double stars (**) and other symbols
-    # echo "$RES" | sed 's/^[-*] //; s/^\*\*//g; s/^\* //; s/^# //; s/^## //; s/^### //;'
-
-    echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text'
-
+    echo "✅ Suggestions received:"
+    echo "$SUGGESTIONS"
+    echo ""
     echo "Please select one of the options above by entering the corresponding number (1-5):"
     read -p "Your choice: " selected_option
 
-    if [[ "$selected_option" =~ ^[1-5]$ ]]; then
-        echo "You selected option $selected_option. Use this information for the next step."
-    else
+    if [[ ! "$selected_option" =~ ^[1-5]$ ]]; then
         echo "❌ Invalid selection. Please try again."
+        return 1
     fi
+    
+    # Extract the selected suggestion
+    SELECTED_SUGGESTION=$(echo "$SUGGESTIONS" | sed -n "/^$selected_option\./,/^$((selected_option+1))\.|$/p" | sed "/^$((selected_option+1))\./d")
+    
+    # Parse the suggestion to extract parameters
+    TOPIC=$(echo "$SELECTED_SUGGESTION" | grep -i "Title\|Topic" | sed 's/.*[Tt]itle[: ]*//' | sed 's/.*[Tt]opic[: ]*//' | sed 's/^[[:space:]]*//')
+    GENRE=$(echo "$SELECTED_SUGGESTION" | grep -i "Genre" | sed 's/.*[Gg]enre[: ]*//' | sed 's/^[[:space:]]*//')
+    AUDIENCE=$(echo "$SELECTED_SUGGESTION" | grep -i "Audience" | sed 's/.*[Aa]udience[: ]*//' | sed 's/^[[:space:]]*//')
+    STYLE=$(echo "$SELECTED_SUGGESTION" | grep -i "Style" | sed 's/.*[Ss]tyle[: ]*//' | sed 's/^[[:space:]]*//' | tr '[:upper:]' '[:lower:]')
+    TONE=$(echo "$SELECTED_SUGGESTION" | grep -i "Tone" | sed 's/.*[Tt]one[: ]*//' | sed 's/^[[:space:]]*//' | tr '[:upper:]' '[:lower:]')
+    
+    # Set default style if not found or invalid
+    if ! [[ "$STYLE" =~ ^(detailed|narrative|academic|analytical|descriptive|persuasive|expository|technical)$ ]]; then
+        STYLE="detailed"
+    fi
+    
+    # Set default tone if not found or invalid
+    if ! [[ "$TONE" =~ ^(professional|conversational|authoritative|casual|persuasive|humorous|inspirational|empathetic|bold)$ ]]; then
+        TONE="professional"
+    fi
+    
+    # Export variables for use in the main script
+    export TOPIC="$TOPIC"
+    export GENRE="$GENRE"
+    export AUDIENCE="$AUDIENCE"
+    export STYLE="$STYLE"
+    export TONE="$TONE"
+    
+    echo ""
+    echo "📖 Selected Book Details:"
+    echo "   Topic: $TOPIC"
+    echo "   Genre: $GENRE"
+    echo "   Audience: $AUDIENCE"
+    echo "   Style: $STYLE"
+    echo "   Tone: $TONE"
+    echo ""
+    
+    # Return success
+    return 0
 }
 
 # Main execution
@@ -826,25 +975,37 @@ main() {
 
         case $choice in
             1)
-                echo "Do you want to use a suggested topic? (y/N): "
+                echo "📖 Do you want to use a suggested topic? (y/N): "
                 read use_suggestion
                 tput cuu1 && tput el
                 if [[ $use_suggestion =~ ^[Yy]$ ]]; then
-                    suggest_topics
-                    echo "Select a topic from the suggestions above and enter it below."
+                    if suggest_topics; then
+                        # Skip get_book_details as we already have the parameters from suggest_topics
+                        generate_complete_book_from_suggestion
+                    else
+                        # If suggestion fails, fall back to manual entry
+                        generate_complete_book
+                    fi
+                else
+                    generate_complete_book
                 fi
-                generate_complete_book
                 read -p "Press Enter to continue..."
                 ;;
             2)
-                echo "Do you want to use a suggested topic? (y/N): "
+                echo "📖 Do you want to use a suggested topic? (y/N): "
                 read use_suggestion
                 tput cuu1 && tput el
                 if [[ $use_suggestion =~ ^[Yy]$ ]]; then
-                    suggest_topics
-                    echo "Select a topic from the suggestions above and enter it below."
+                    if suggest_topics; then
+                        # Skip get_book_details as we already have the parameters from suggest_topics
+                        generate_outline_only_from_suggestion
+                    else
+                        # If suggestion fails, fall back to manual entry
+                        generate_outline_only
+                    fi
+                else
+                    generate_outline_only
                 fi
-                generate_outline_only
                 read -p "Press Enter to continue..."
                 ;;
             3)
