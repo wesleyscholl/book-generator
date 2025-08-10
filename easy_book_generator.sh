@@ -5,6 +5,25 @@
 
 set -e
 
+API_KEY="${GEMINI_API_KEY}"
+MODEL="gemini-1.5-flash-latest"
+API_URL="https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent"
+
+# Function to escape JSON strings
+escape_json() {
+    echo "$1" | sed -e 's/"/\\"/g' -e ':a' -e 'N' -e '$!ba' -e 's/\n/\\n/g'
+}
+
+# Function to make API requests
+make_api_request() {
+    local payload="$1"
+    curl -s -X POST \
+        -H "Content-Type: application/json" \
+        -H "x-goog-api-key: $API_KEY" \
+        -d "$payload" \
+        "$API_URL"
+}
+
 # CLI Animation Functions
 show_spinner() {
     local pid=$1
@@ -527,8 +546,9 @@ if [ -z "$API_KEY" ]; then
     exit 1
 fi
 
+# Function to escape JSON strings
 escape_json() {
-    echo "$1" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g'
+    echo "$1" | sed -e 's/"/\\"/g' -e ':a' -e 'N' -e '$!ba' -e 's/\n/\\n/g'
 }
 
 make_api_request() {
@@ -733,6 +753,55 @@ compile_manuscript() {
     ./compile_book.sh "$SELECTED_DIR" "$FORMAT" "$version_choice"
 }
 
+# Enhance the suggest_topics function to include research-based criteria
+suggest_topics() {
+    loading_dots 5 "➡️  📚 Fetching 5 research-based book suggestions"
+    CURRENT_DATE=$(date +"%B %Y")
+    SUGGESTION_PROMPT="Search the internet, research and provide 5 detailed book suggestions based on the following criteria:
+- Topics and genres with demand and less saturation (e.g., from Kindle Direct Publishing trends).
+- Topics that solve narrowly defined reader problems, pain points, or frustrations.
+- Current ($CURRENT_DATE) in-demand topics with a high probability of success and low risk of failure.
+- Topics with potential for creating additional books (series, bundles, etc.).
+- Topics that are easier to create (less research required) and have low competition in the (sub) genre.
+
+Each suggestion should include:
+- Topic/Title
+- Genre
+- Target Audience
+- Writing Style
+- Tone
+
+Important:Return just the list of 5 book topics, without markdown formatting or any other text. Don't include explanations or additional information, just return the list of topics 1-5."
+    ESCAPED_SUGGESTION_PROMPT=$(escape_json "$SUGGESTION_PROMPT")
+    SUGGESTION_JSON_PAYLOAD='{"contents":[{"parts":[{"text":"'"$ESCAPED_SUGGESTION_PROMPT"'"}]}],"generationConfig":{"temperature":0.7,"topK":40,"topP":0.95,"maxOutputTokens":1500}}'
+    RESPONSE=$(make_api_request "$SUGGESTION_JSON_PAYLOAD")
+
+    if [ $? -ne 0 ]; then
+        echo "❌ Failed to fetch suggestions. Please try again."
+        return
+    fi
+
+    echo "✅ Suggestions received:"
+    # Clear the entire terminal
+    clear
+    # Clean the response, only show the text starting from the first numbered option (e.g., 1.)
+    # RES=$(echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text' | sed -n '/^1\./,$p')
+
+    # Strip all markdown formatting - including double stars (**) and other symbols
+    # echo "$RES" | sed 's/^[-*] //; s/^\*\*//g; s/^\* //; s/^# //; s/^## //; s/^### //;'
+
+    echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text'
+
+    echo "Please select one of the options above by entering the corresponding number (1-5):"
+    read -p "Your choice: " selected_option
+
+    if [[ "$selected_option" =~ ^[1-5]$ ]]; then
+        echo "You selected option $selected_option. Use this information for the next step."
+    else
+        echo "❌ Invalid selection. Please try again."
+    fi
+}
+
 # Main execution
 main() {
     # Check dependencies
@@ -754,13 +823,27 @@ main() {
     while true; do
         show_interactive_menu
         read choice
-        
+
         case $choice in
             1)
+                echo "Do you want to use a suggested topic? (y/N): "
+                read use_suggestion
+                tput cuu1 && tput el
+                if [[ $use_suggestion =~ ^[Yy]$ ]]; then
+                    suggest_topics
+                    echo "Select a topic from the suggestions above and enter it below."
+                fi
                 generate_complete_book
                 read -p "Press Enter to continue..."
                 ;;
             2)
+                echo "Do you want to use a suggested topic? (y/N): "
+                read use_suggestion
+                tput cuu1 && tput el
+                if [[ $use_suggestion =~ ^[Yy]$ ]]; then
+                    suggest_topics
+                    echo "Select a topic from the suggestions above and enter it below."
+                fi
                 generate_outline_only
                 read -p "Press Enter to continue..."
                 ;;
