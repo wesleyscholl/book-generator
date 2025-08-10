@@ -331,7 +331,75 @@ EOF
     OUTLINE_FILE="${OUTPUT_DIR}/book_outline_${TIMESTAMP}.md"
 
     echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text' > "$OUTLINE_FILE"
-    echo "✅ Outline generated and saved to: $OUTLINE_FILE"
+    echo "📃 Outline generated and saved to: $OUTLINE_FILE"
+
+    # Review and Proofreading Step
+    sleep 2
+    REVIEW_PROMPT="Review and proofread the following book outline for grammar, clarity, and structure. Suggest any necessary corrections or improvements."
+    ESCAPED_REVIEW_PROMPT=$(escape_json "$REVIEW_PROMPT")
+
+    REVIEW_JSON_PAYLOAD=$(cat << EOF
+{
+"contents": [{
+    "parts": [{
+    "text": "SYSTEM: ${ESCAPED_SYSTEM}\n\nUSER: ${ESCAPED_REVIEW_PROMPT}\n\nOUTLINE:\n${OUTLINE_CONTENT}"
+    }]
+}],
+"generationConfig": {
+    "temperature": 0.7,
+    "topK": 40,
+    "topP": 0.95,
+    "maxOutputTokens": 100000
+}
+}
+EOF
+)
+
+    echo "🔄 Making API request for review and proofreading..."
+    REVIEW_RESPONSE=$(make_api_request "$REVIEW_JSON_PAYLOAD")
+
+    if [ $? -ne 0 ]; then
+        echo "❌ API request for review failed. Exiting."
+        exit 1
+    fi
+
+    REVIEWED_OUTLINE_FILE="${OUTPUT_DIR}/book_outline_reviewed_${TIMESTAMP}.md"
+    echo "$REVIEW_RESPONSE" | jq -r '.candidates[0].content.parts[0].text' > "$REVIEWED_OUTLINE_FILE"
+    echo "✅ Reviewed outline saved to: $REVIEWED_OUTLINE_FILE"
+
+    # Second/Final Draft Step
+    sleep 2
+    FINAL_DRAFT_PROMPT="Improve the following book outline in any way possible. Focus on enhancing its quality, structure, and content. Ensure it is engaging and well-organized."
+    ESCAPED_FINAL_DRAFT_PROMPT=$(escape_json "$FINAL_DRAFT_PROMPT")
+
+    FINAL_DRAFT_JSON_PAYLOAD=$(cat << EOF
+{
+"contents": [{
+    "parts": [{
+    "text": "SYSTEM: ${ESCAPED_SYSTEM}\n\nUSER: ${ESCAPED_FINAL_DRAFT_PROMPT}\n\nOUTLINE:\n$(cat "$REVIEWED_OUTLINE_FILE")"
+    }]
+}],
+"generationConfig": {
+    "temperature": 0.7,
+    "topK": 40,
+    "topP": 0.95,
+    "maxOutputTokens": 100000
+}
+}
+EOF
+)
+
+    echo "🔄 Making API request for second/final draft..."
+    FINAL_DRAFT_RESPONSE=$(make_api_request "$FINAL_DRAFT_JSON_PAYLOAD")
+
+    if [ $? -ne 0 ]; then
+        echo "❌ API request for final draft failed. Exiting."
+        exit 1
+    fi
+
+    FINAL_DRAFT_FILE="${OUTPUT_DIR}/book_outline_final_${TIMESTAMP}.md"
+    echo "$FINAL_DRAFT_RESPONSE" | jq -r '.candidates[0].content.parts[0].text' > "$FINAL_DRAFT_FILE"
+    echo "✅ Final draft saved to: $FINAL_DRAFT_FILE"
     
     # Check if outline only mode is enabled
     if [ "$OUTLINE_ONLY" = true ]; then
