@@ -52,6 +52,39 @@ EXAMPLES:
 EOF
 }
 
+loading_dots() {
+    local duration=${1:-3}
+    local message="${2:-Loading}"
+    local count=0
+    local max_dots=3
+    
+    while [ $count -lt $((duration * 10)) ]; do
+        local dots=$((count % (max_dots + 1)))
+        printf "\r\033[K⏳ $message"
+        for ((i=0; i<dots; i++)); do
+            printf "."
+        done
+        sleep 0.1
+        count=$((count + 1))
+    done
+    printf "\r\033[K"
+}
+
+show_spinner() {
+    local pid=$1
+    local delay=0.15
+    local spinstr='|/-\'
+    local message="${2:-Processing}"
+    
+    while [ "$(ps a | awk '{print $1}' | grep $pid)" ]; do
+        local temp=${spinstr#?}
+        printf "\r\033[K🔄 $message %c" "$spinstr"
+        local spinstr=$temp${spinstr%"$temp"}
+        sleep $delay
+    done
+    printf "\r\033[K"
+}
+
 # Debug, echo all passed parameters
 echo "Debug: Arguments passed: $@"
 
@@ -208,27 +241,31 @@ echo ""
 # API configuration
 API_URL="https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent"
 
-# Utility functions
+# Utility function to escape JSON strings
 escape_json() {
-    echo "$1" | sed -e 's/"/\\"/g' -e ':a' -e 'N' -e '$!ba' -e 's/\n/\\n/g'
+    echo "$1" | sed -e 's/"/\\"/g' -e ':a' -e 'N' -e '$!ba' -e 's/\n/\\n/g' -e 's/\r/\\r/g'
 }
 
+# Utility functions
 make_api_request() {
     local payload="$1"
     local response
-    
+
     response=$(curl -s -X POST \
         -H "Content-Type: application/json" \
         -H "x-goog-api-key: $API_KEY" \
         -d "$payload" \
         "$API_URL")
-    
+
+    echo "Debug: Raw API response:" > debug.log
+    echo "$response" >> debug.log
+
     if echo "$response" | jq -e '.error' > /dev/null 2>&1; then
         echo "❌ API Error:"
         echo "$response" | jq '.error'
         return 1
     fi
-    
+
     echo "$response"
 }
 
@@ -316,7 +353,7 @@ Make sure chapter titles are specific and promise clear value to readers."
 EOF
 )
 
-    echo "🔄 Making API request for outline..."
+    loading_dots 3 "🔄 Making API request for outline"
     RESPONSE=$(make_api_request "$JSON_PAYLOAD")
     
     if [ $? -ne 0 ]; then
@@ -338,6 +375,18 @@ EOF
     REVIEW_PROMPT="Review and proofread the following book outline for grammar, clarity, and structure. Suggest any necessary corrections or improvements."
     ESCAPED_REVIEW_PROMPT=$(escape_json "$REVIEW_PROMPT")
 
+    # Ensure OUTLINE_CONTENT is populated with the correct outline file content
+    if [ -f "$OUTLINE_FILE" ]; then
+        OUTLINE_CONTENT=$(cat "$OUTLINE_FILE")
+    else
+        echo "❌ Error: Outline file not found at $OUTLINE_FILE"
+        exit 1
+    fi
+
+    # Debugging: Confirm OUTLINE_CONTENT before review step
+    echo "Debug: OUTLINE_CONTENT before review step:" > debug.log
+    echo "$OUTLINE_CONTENT" | head -n 10 >> debug.log  # Log first 10 lines for context
+
     REVIEW_JSON_PAYLOAD=$(cat << EOF
 {
 "contents": [{
@@ -355,7 +404,7 @@ EOF
 EOF
 )
 
-    echo "🔄 Making API request for review and proofreading..."
+    loading_dots 3 "🔄 Making API request for review and proofreading"
     REVIEW_RESPONSE=$(make_api_request "$REVIEW_JSON_PAYLOAD")
 
     if [ $? -ne 0 ]; then
@@ -388,8 +437,7 @@ EOF
 }
 EOF
 )
-
-    echo "🔄 Making API request for second/final draft..."
+    loading_dots 3 "🔄 Making API request for second/final draft"
     FINAL_DRAFT_RESPONSE=$(make_api_request "$FINAL_DRAFT_JSON_PAYLOAD")
 
     if [ $? -ne 0 ]; then
@@ -407,6 +455,49 @@ EOF
         exit 0
     fi
 fi
+
+# Debugging: Ensure OUTLINE_CONTENT is populated before final draft step
+if [ -z "$OUTLINE_CONTENT" ]; then
+    echo "❌ Error: OUTLINE_CONTENT is empty. Ensure the outline was generated successfully."
+    exit 1
+fi
+
+# Debugging: Add trace for final draft step
+echo "Debug: Starting final draft step with OUTLINE_CONTENT:"
+echo "$OUTLINE_CONTENT" | head -n 10  # Show first 10 lines for context
+
+# Debugging: Add trace for chapter generation
+CHAPTERS_INFO=$(extract_chapters "$OUTLINE_FILE")
+if [ -z "$CHAPTERS_INFO" ]; then
+    echo "❌ Error: Could not extract chapter information from outline"
+    echo "Please check that your outline contains chapters in format:"
+    echo "Chapter 1: Title"
+    echo "Chapter 2: Title"
+    exit 1
+fi
+
+# Debugging: Add trace for API request failures
+make_api_request() {
+    local payload="$1"
+    local response
+
+    response=$(curl -s -X POST \
+        -H "Content-Type: application/json" \
+        -H "x-goog-api-key: $API_KEY" \
+        -d "$payload" \
+        "$API_URL")
+
+    echo "Debug: Raw API response:" > debug.log
+    echo "$response" >> debug.log
+
+    if echo "$response" | jq -e '.error' > /dev/null 2>&1; then
+        echo "❌ API Error:"
+        echo "$response" | jq '.error'
+        return 1
+    fi
+
+    echo "$response"
+}
 
 # Extract chapters from outline
 echo ""
