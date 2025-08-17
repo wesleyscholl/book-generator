@@ -107,18 +107,21 @@ mkdir -p "$OUTPUT_DIR"
 # Extract text from markdown (remove markdown syntax)
 extract_text_from_markdown() {
     local file="$1"
-    # Remove markdown headers, links, bold/italic, etc.
-    sed -E '
-        s/^#+\s*//g          # Remove headers
-        s/\*\*([^*]+)\*\*/\1/g # Remove bold
-        s/\*([^*]+)\*/\1/g     # Remove italic
-        s/\[([^\]]+)\]\([^)]+\)/\1/g # Remove links, keep text
-        s/`([^`]+)`/\1/g       # Remove inline code
-        /^```/,/^```/d         # Remove code blocks
-        s/^[-*+]\s*//g         # Remove bullet points
-        s/^[0-9]+\.\s*//g      # Remove numbered lists
-        /^$/d                  # Remove empty lines
-    ' "$file" | tr '\n' ' ' | sed 's/  */ /g'
+    # Remove markdown headers, links, bold/italic, etc. using multiple sed commands
+    cat "$file" | \
+    sed 's/^[#]*[[:space:]]*//g' | \
+    sed 's/\*\*\([^*]*\)\*\*/\1/g' | \
+    sed 's/\*\([^*]*\)\*/\1/g' | \
+    sed 's/\[\([^]]*\)\]([^)]*)/\1/g' | \
+    sed 's/`\([^`]*\)`/\1/g' | \
+    sed '/^```/,/^```/d' | \
+    sed 's/^[-*+][[:space:]]*//g' | \
+    sed 's/^[0-9]*\.[[:space:]]*//g' | \
+    sed '/^[[:space:]]*$/d' | \
+    tr '\n' ' ' | \
+    sed 's/[[:space:]]\+/ /g' | \
+    sed 's/^[[:space:]]*//' | \
+    sed 's/[[:space:]]*$//'
 }
 
 # Check LanguageTool server availability
@@ -211,10 +214,19 @@ generate_quality_report() {
     local avg_sentence_length=$(( word_count / sentence_count ))
     
     # Calculate quality score (0-100)
-    local error_rate=$(echo "scale=4; $total_matches / $word_count * 100" | bc -l 2>/dev/null || echo "0")
-    local quality_score=$(echo "scale=0; 100 - ($error_rate * 10)" | bc -l 2>/dev/null || echo "100")
+    local error_rate=0
+    local quality_score=100
+    
+    if [ "$word_count" -gt 0 ] && [ "$total_matches" -gt 0 ]; then
+        error_rate=$(echo "scale=2; $total_matches / $word_count * 100" | bc -l 2>/dev/null || echo "0")
+        quality_score=$(echo "scale=0; 100 - ($error_rate * 10)" | bc -l 2>/dev/null || echo "100")
+    fi
+    
+    # Ensure quality score is between 0 and 100
     if [ $(echo "$quality_score < 0" | bc -l 2>/dev/null || echo "0") -eq 1 ]; then
         quality_score=0
+    elif [ $(echo "$quality_score > 100" | bc -l 2>/dev/null || echo "0") -eq 1 ]; then
+        quality_score=100
     fi
     
     # Generate report
@@ -303,21 +315,24 @@ auto_fix_issues() {
     
     # Apply simple fixes (be very conservative)
     local fixes_applied=0
+    local temp_file=$(mktemp)
     
     # Fix double spaces
-    if sed -i 's/  */ /g' "$chapter_file"; then
+    if sed 's/  \+/ /g' "$chapter_file" > "$temp_file" && mv "$temp_file" "$chapter_file"; then
         fixes_applied=$((fixes_applied + 1))
     fi
     
-    # Fix common punctuation issues
-    if sed -i "s/\s*\([,.!?]\)/\1/g" "$chapter_file"; then
+    # Fix common punctuation issues (remove spaces before punctuation)
+    if sed 's/ \+\([,.!?]\)/\1/g' "$chapter_file" > "$temp_file" && mv "$temp_file" "$chapter_file"; then
         fixes_applied=$((fixes_applied + 1))
     fi
     
-    # Add space after periods if missing
-    if sed -i "s/\([.!?]\)\([A-Z]\)/\1 \2/g" "$chapter_file"; then
+    # Add space after periods if missing (but be careful with abbreviations)
+    if sed 's/\([.!?]\)\([A-Z]\)/\1 \2/g' "$chapter_file" > "$temp_file" && mv "$temp_file" "$chapter_file"; then
         fixes_applied=$((fixes_applied + 1))
     fi
+    
+    rm -f "$temp_file"
     
     echo -e "${GREEN}✅ Applied $fixes_applied basic fixes${NC}"
     echo -e "${YELLOW}💾 Backup saved as: $(basename "$backup_file")${NC}"
@@ -371,7 +386,7 @@ main() {
     
     # Show summary
     TOTAL_ISSUES=$(echo "$LT_RESULT" | jq -r '.matches | length')
-    QUALITY_SCORE=$(grep "Quality Score" "$REPORT_FILE" | grep -o '[0-9]*%')
+    QUALITY_SCORE=$(grep "Quality Score" "$REPORT_FILE" | sed 's/.*Quality Score:\*\* \([0-9]*\)%.*/\1%/' || echo "N/A")
     
     echo ""
     echo -e "${PURPLE}📋 SUMMARY${NC}"
@@ -380,11 +395,8 @@ main() {
     echo -e "Report: $(basename "$REPORT_FILE")"
     
     if [ "$TOTAL_ISSUES" -gt 0 ]; then
-        echo ""
-        read -p "🔧 Apply automatic fixes for common issues? (y/N): " apply_fixes
-        if [[ $apply_fixes =~ ^[Yy]$ ]]; then
-            auto_fix_issues "$CHAPTER_FILE" "$LT_RESULT"
-        fi
+        echo -e "${CYAN}🔧 Applying automatic fixes for common issues...${NC}"
+        auto_fix_issues "$CHAPTER_FILE" "$LT_RESULT"
     fi
     
     # Verbose output

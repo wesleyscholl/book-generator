@@ -11,7 +11,8 @@ API_URL="https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:genera
 
 # Function to escape JSON strings
 escape_json() {
-    echo "$1" | sed -e 's/"/\\"/g' -e ':a' -e 'N' -e '$!ba' -e 's/\n/\\n/g'
+    # Use jq to properly escape JSON strings
+    echo -n "$1" | jq -Rs '.'
 }
 
 # Function to make API requests
@@ -358,7 +359,7 @@ generate_complete_book() {
     ./full_book_generator.sh "$TOPIC" "$GENRE" "$AUDIENCE" \
         --style "$STYLE" \
         --tone "$TONE" \
-        --delay 30
+        --delay 15
     
     if [ $? -eq 0 ]; then
         echo ""
@@ -369,7 +370,7 @@ generate_complete_book() {
         # Ask about editing
         read -p "✨ Run AI review and editing? (Y/n): " run_editing
         if [[ ! $run_editing =~ ^[Nn]$ ]]; then
-            LATEST_DIR=$(ls -td ./book_outputs/book_outline_* 2>/dev/null | head -1)
+            LATEST_DIR=$(ls -td ./book_outputs/*-* 2>/dev/null | head -1)
             if [ -n "$LATEST_DIR" ]; then
                 review_and_edit_book "$LATEST_DIR"
             fi
@@ -377,7 +378,7 @@ generate_complete_book() {
         
         read -p "📖 Compile into final manuscript now? (Y/n): " compile_now
         if [[ ! $compile_now =~ ^[Nn]$ ]]; then
-            LATEST_DIR=$(ls -td ./book_outputs/book_outline_* 2>/dev/null | head -1)
+            LATEST_DIR=$(ls -td ./book_outputs/*-* 2>/dev/null | head -1)
             if [ -n "$LATEST_DIR" ]; then
                 ./compile_book.sh "$LATEST_DIR"
             fi
@@ -421,7 +422,7 @@ generate_complete_book_from_suggestion() {
     ./full_book_generator.sh "$TOPIC" "$GENRE" "$AUDIENCE" \
         --style "$STYLE" \
         --tone "$TONE" \
-        --delay 30
+        --delay 15
     
     if [ $? -eq 0 ]; then
         echo ""
@@ -432,7 +433,7 @@ generate_complete_book_from_suggestion() {
         # Ask about editing
         read -p "✨ Run AI review and editing? (Y/n): " run_editing
         if [[ ! $run_editing =~ ^[Nn]$ ]]; then
-            LATEST_DIR=$(ls -td ./book_outputs/book_outline_* 2>/dev/null | head -1)
+            LATEST_DIR=$(ls -td ./book_outputs/*-* 2>/dev/null | head -1)
             if [ -n "$LATEST_DIR" ]; then
                 review_and_edit_book "$LATEST_DIR"
             fi
@@ -440,7 +441,7 @@ generate_complete_book_from_suggestion() {
         
         read -p "📖 Compile into final manuscript now? (Y/n): " compile_now
         if [[ ! $compile_now =~ ^[Nn]$ ]]; then
-            LATEST_DIR=$(ls -td ./book_outputs/book_outline_* 2>/dev/null | head -1)
+            LATEST_DIR=$(ls -td ./book_outputs/*-* 2>/dev/null | head -1)
             if [ -n "$LATEST_DIR" ]; then
                 ./compile_book.sh "$LATEST_DIR"
             fi
@@ -469,6 +470,12 @@ generate_outline_only() {
     if [ $? -eq 0 ]; then
         echo "✅ Outline generated successfully"
         echo "Use option 3 to generate chapters from this outline"
+        
+        # Show the created directory
+        LATEST_DIR=$(ls -td ./book_outputs/*-* 2>/dev/null | head -1)
+        if [ -n "$LATEST_DIR" ]; then
+            echo "📁 Book directory: $(basename "$LATEST_DIR")"
+        fi
     fi
 }
 
@@ -486,37 +493,160 @@ generate_outline_only_from_suggestion() {
     if [ $? -eq 0 ]; then
         echo "✅ Outline generated successfully"
         echo "Use option 3 to generate chapters from this outline"
+        
+        # Show the created directory
+        LATEST_DIR=$(ls -td ./book_outputs/*-* 2>/dev/null | head -1)
+        if [ -n "$LATEST_DIR" ]; then
+            echo "📁 Book directory: $(basename "$LATEST_DIR")"
+        fi
     fi
 }
 
 generate_chapters_from_outline() {
     echo ""
-    echo "📁 Available outline files:"
+    echo "📁 Available book directories:"
     
-    OUTLINE_FILES=($(ls ./book_outputs/book_outline_*.md 2>/dev/null))
+    # Make sure the output directory exists
+    if [ ! -d "./book_outputs" ]; then
+        mkdir -p ./book_outputs
+    fi
     
-    if [ ${#OUTLINE_FILES[@]} -eq 0 ]; then
-        echo "❌ No outline files found in ./book_outputs/"
+    # Create arrays to hold found files and directories
+    declare -a OLD_OUTLINE_FILES
+    declare -a BOOK_DIRS
+    declare -a ALL_OUTLINES
+    
+    # Look for old format individual outline files (direct in book_outputs)
+    if compgen -G "./book_outputs/book_outline_*.md" > /dev/null; then
+        OLD_OUTLINE_FILES=(./book_outputs/book_outline_*.md)
+    fi
+    
+    # Find all directories in book_outputs folder
+    if [ -d "./book_outputs" ]; then
+        for dir in ./book_outputs/*/; do
+            if [ -d "$dir" ]; then
+                BOOK_DIRS+=("$dir")
+            fi
+        done
+    fi
+    
+    declare -a ALL_OUTLINES
+    
+    # Add old format outline files
+    for outline in "${OLD_OUTLINE_FILES[@]}"; do
+        if [ -f "$outline" ]; then
+            ALL_OUTLINES+=("$outline")
+        fi
+    done
+    
+    # Process all book directories to find outlines
+    for dir in "${BOOK_DIRS[@]}"; do
+        if [ -d "$dir" ]; then
+            # Try to find any outline files (multiple patterns)
+            outline_file=""
+            
+            # First try to find any outline file in the directory
+            outline_file=$(find "$dir" -name "*outline*.md" 2>/dev/null | head -1)
+            
+            # If that doesn't work, try a more specific pattern
+            if [ -z "$outline_file" ]; then
+                outline_file=$(find "$dir" -name "book_outline*.md" 2>/dev/null | head -1)
+            fi
+            
+            # If that fails, try a simpler approach
+            if [ -z "$outline_file" ]; then
+                outline_file=$(find "$dir" -name "*.md" | grep -i outline | head -1)
+            fi
+            
+            # If still nothing, just find any markdown file
+            if [ -z "$outline_file" ]; then
+                outline_file=$(find "$dir" -name "*.md" | head -1)
+            fi
+            
+            # If we found an outline file, add it to our list
+            if [ -n "$outline_file" ] && [ -f "$outline_file" ]; then
+                ALL_OUTLINES+=("$outline_file")
+            fi
+        fi
+    done
+    
+    if [ ${#ALL_OUTLINES[@]} -eq 0 ]; then
+        echo "❌ No book outlines found"
+        echo ""
         echo "Generate an outline first using option 2"
         return 1
     fi
     
-    for i in "${!OUTLINE_FILES[@]}"; do
-        BASENAME=$(basename "${OUTLINE_FILES[$i]}")
-        TIMESTAMP=$(echo "$BASENAME" | grep -o '[0-9]\{8\}_[0-9]\{6\}')
-        FORMATTED_DATE=$(date -d "${TIMESTAMP:0:8} ${TIMESTAMP:9:2}:${TIMESTAMP:11:2}:${TIMESTAMP:13:2}" "+%Y-%m-%d %H:%M" 2>/dev/null || echo "$TIMESTAMP")
-        echo "   $((i+1))) $BASENAME (Created: $FORMATTED_DATE)"
+    # Display all found outlines/directories
+    for i in "${!ALL_OUTLINES[@]}"; do
+        OUTLINE_PATH="${ALL_OUTLINES[$i]}"
+        
+        # Make sure the outline path exists
+        if [ ! -f "$OUTLINE_PATH" ]; then
+            echo "   $((i+1))) Missing outline: $OUTLINE_PATH"
+            continue
+        fi
+        
+        # Get directory path if it's in a directory
+        if [[ "$OUTLINE_PATH" == *"/"* ]]; then
+            DIR_PATH=$(dirname "$OUTLINE_PATH")
+            DIR_NAME=$(basename "$DIR_PATH")
+            CHAPTER_COUNT=$(find "$DIR_PATH" -name "chapter_*.md" 2>/dev/null | wc -l)
+            
+            # Handle different directory naming conventions
+            if [[ "$DIR_NAME" == *"-"*"_"*"_"* || "$DIR_NAME" == *"-"*"-"*"-"* ]]; then
+                # This is likely a topic-based directory with timestamp
+                # Extract topic name by removing timestamp portion
+                TOPIC=$(echo "$DIR_NAME" | sed -E 's/-[0-9]{8}_[0-9]{6}$//' | sed 's/-/ /g')
+                TOPIC=$(echo "$TOPIC" | awk '{for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2); print}')
+                
+                # Get timestamp for date display
+                TIMESTAMP=$(echo "$DIR_NAME" | grep -o '[0-9]\{8\}_[0-9]\{6\}')
+                if [ -n "$TIMESTAMP" ]; then
+                    YEAR="${TIMESTAMP:0:4}"
+                    MONTH="${TIMESTAMP:4:2}"
+                    DAY="${TIMESTAMP:6:2}"
+                    HOUR="${TIMESTAMP:9:2}"
+                    MINUTE="${TIMESTAMP:11:2}"
+                    FORMATTED_DATE="${YEAR}-${MONTH}-${DAY} ${HOUR}:${MINUTE}"
+                    
+                    # Show chapter info and creation date
+                    if [ "$CHAPTER_COUNT" -eq 0 ]; then
+                        echo "   $((i+1))) 📑 $TOPIC (Outline only, Created: $FORMATTED_DATE)"
+                    elif [ "$CHAPTER_COUNT" -eq 1 ]; then
+                        echo "   $((i+1))) 📚 $TOPIC ($CHAPTER_COUNT chapter, Created: $FORMATTED_DATE)"
+                    else
+                        echo "   $((i+1))) 📚 $TOPIC ($CHAPTER_COUNT chapters, Created: $FORMATTED_DATE)" 
+                    fi
+                else
+                    echo "   $((i+1))) 📚 $DIR_NAME ($CHAPTER_COUNT chapters)"
+                fi
+            else
+                # Other directory format
+                echo "   $((i+1))) $DIR_NAME ($CHAPTER_COUNT chapters)"
+            fi
+        else
+            # Old format: standalone outline file
+            BASENAME=$(basename "$OUTLINE_PATH")
+            TIMESTAMP=$(echo "$BASENAME" | grep -o '[0-9]\{8\}_[0-9]\{6\}')
+            if [ -n "$TIMESTAMP" ]; then
+                FORMATTED_DATE=$(date -r "$OUTLINE_PATH" "+%Y-%m-%d %H:%M" 2>/dev/null || echo "$TIMESTAMP")
+                echo "   $((i+1))) $BASENAME (Created: $FORMATTED_DATE)"
+            else
+                echo "   $((i+1))) $BASENAME"
+            fi
+        fi
     done
     
     echo ""
-    read -p "Select outline file (1-${#OUTLINE_FILES[@]}): " file_choice
+    read -p "Select outline file (1-${#ALL_OUTLINES[@]}): " file_choice
     
-    if [[ ! "$file_choice" =~ ^[0-9]+$ ]] || [ "$file_choice" -lt 1 ] || [ "$file_choice" -gt "${#OUTLINE_FILES[@]}" ]; then
+    if [[ ! "$file_choice" =~ ^[0-9]+$ ]] || [ "$file_choice" -lt 1 ] || [ "$file_choice" -gt "${#ALL_OUTLINES[@]}" ]; then
         echo "❌ Invalid selection"
         return 1
     fi
     
-    SELECTED_OUTLINE="${OUTLINE_FILES[$((file_choice-1))]}"
+    SELECTED_OUTLINE="${ALL_OUTLINES[$((file_choice-1))]}"
     
     echo ""
     echo "📖 Selected: $(basename "$SELECTED_OUTLINE")"
@@ -530,7 +660,7 @@ generate_chapters_from_outline() {
     fi
     
     echo ""
-    pulse_text "✍️ Starting chapter generation..."
+    pulse_text "✍️  Starting chapter generation..."
 
     ./full_book_generator.sh "" "" "" --chapters-only "$SELECTED_OUTLINE"
 
@@ -559,28 +689,51 @@ review_and_edit_book() {
         echo ""
         echo "📁 Available book directories:"
         
-        BOOK_DIRS=($(ls -d ./book_outputs/book_outline_* 2>/dev/null))
+        # Look for all types of book directories
+        OLD_BOOK_DIRS=($(ls -d ./book_outputs/book_outline_* 2>/dev/null))
+        NEW_BOOK_DIRS=($(ls -d ./book_outputs/*-[0-9]*_[0-9]* 2>/dev/null))
+        # Dynamic directories with sanitized topic names (format: topic-YYYYMMDD_HHMMSS)
+        TOPIC_DIRS=($(ls -d ./book_outputs/*-2*_*_* 2>/dev/null))
         
-        if [ ${#BOOK_DIRS[@]} -eq 0 ]; then
+        declare -a ALL_BOOK_DIRS
+        
+        # Add old format directories
+        for dir in "${OLD_BOOK_DIRS[@]}"; do
+            ALL_BOOK_DIRS+=("$dir")
+        done
+        
+        # Add new format directories
+        for dir in "${NEW_BOOK_DIRS[@]}"; do
+            ALL_BOOK_DIRS+=("$dir")
+        done
+        
+        # Add topic-based dynamic directories
+        for dir in "${TOPIC_DIRS[@]}"; do
+            if [[ ! " ${ALL_BOOK_DIRS[*]} " =~ " ${dir} " ]]; then
+                ALL_BOOK_DIRS+=("$dir")
+            fi
+        done
+        
+        if [ ${#ALL_BOOK_DIRS[@]} -eq 0 ]; then
             echo "❌ No book directories found"
             return 1
         fi
         
-        for i in "${!BOOK_DIRS[@]}"; do
-            DIR_NAME=$(basename "${BOOK_DIRS[$i]}")
-            CHAPTER_COUNT=$(ls "${BOOK_DIRS[$i]}"/chapter_*.md 2>/dev/null | wc -l)
+        for i in "${!ALL_BOOK_DIRS[@]}"; do
+            DIR_NAME=$(basename "${ALL_BOOK_DIRS[$i]}")
+            CHAPTER_COUNT=$(ls "${ALL_BOOK_DIRS[$i]}"/chapter_*.md 2>/dev/null | wc -l)
             echo "   $((i+1))) $DIR_NAME ($CHAPTER_COUNT chapters)"
         done
         
         echo ""
-        read -p "Select directory (1-${#BOOK_DIRS[@]}): " dir_choice
+        read -p "Select directory (1-${#ALL_BOOK_DIRS[@]}): " dir_choice
         
-        if [[ ! "$dir_choice" =~ ^[0-9]+$ ]] || [ "$dir_choice" -lt 1 ] || [ "$dir_choice" -gt "${#BOOK_DIRS[@]}" ]; then
+        if [[ ! "$dir_choice" =~ ^[0-9]+$ ]] || [ "$dir_choice" -lt 1 ] || [ "$dir_choice" -gt "${#ALL_BOOK_DIRS[@]}" ]; then
             echo "❌ Invalid selection"
             return 1
         fi
         
-        BOOK_DIR="${BOOK_DIRS[$((dir_choice-1))]}"
+        BOOK_DIR="${ALL_BOOK_DIRS[$((dir_choice-1))]}"
     fi
     
     echo ""
@@ -629,7 +782,7 @@ fi
 
 # Function to escape JSON strings
 escape_json() {
-    echo "$1" | sed -e 's/"/\\"/g' -e ':a' -e 'N' -e '$!ba' -e 's/\n/\\n/g'
+    echo -n "$1" | jq -Rs '.'
 }
 
 make_api_request() {
@@ -659,7 +812,21 @@ $chapter_content"
     
     local escaped_prompt=$(escape_json "$review_prompt")
     
-    local json_payload='{"contents":[{"parts":[{"text":"'"$escaped_prompt"'"}]}],"generationConfig":{"temperature":0.7,"topK":40,"topP":0.95,"maxOutputTokens":8192}}'
+    local json_payload=$(jq -n \
+        --arg prompt "$review_prompt" \
+        '{
+            "contents": [{
+                "parts": [{
+                    "text": $prompt
+                }]
+            }],
+            "generationConfig": {
+                "temperature": 0.7,
+                "topK": 40,
+                "topP": 0.95,
+                "maxOutputTokens": 8192
+            }
+        }')
     
     local response=$(make_api_request "$json_payload")
     echo "$response" | jq -r '.candidates[0].content.parts[0].text' 2>/dev/null || echo "Error in review"
@@ -684,7 +851,21 @@ $chapter_content"
     
     local escaped_prompt=$(escape_json "$edit_prompt")
     
-    local json_payload='{"contents":[{"parts":[{"text":"'"$escaped_prompt"'"}]}],"generationConfig":{"temperature":0.7,"topK":40,"topP":0.95,"maxOutputTokens":32768}}'
+    local json_payload=$(jq -n \
+        --arg prompt "$edit_prompt" \
+        '{
+            "contents": [{
+                "parts": [{
+                    "text": $prompt
+                }]
+            }],
+            "generationConfig": {
+                "temperature": 0.7,
+                "topK": 40,
+                "topP": 0.95,
+                "maxOutputTokens": 32768
+            }
+        }')
     
     local response=$(make_api_request "$json_payload")
     echo "$response" | jq -r '.candidates[0].content.parts[0].text' 2>/dev/null || echo "Error in editing"
@@ -708,7 +889,21 @@ $chapter_content"
     
     local escaped_prompt=$(escape_json "$proofread_prompt")
     
-    local json_payload='{"contents":[{"parts":[{"text":"'"$escaped_prompt"'"}]}],"generationConfig":{"temperature":0.3,"topK":20,"topP":0.9,"maxOutputTokens":32768}}'
+    local json_payload=$(jq -n \
+        --arg prompt "$proofread_prompt" \
+        '{
+            "contents": [{
+                "parts": [{
+                    "text": $prompt
+                }]
+            }],
+            "generationConfig": {
+                "temperature": 0.3,
+                "topK": 20,
+                "topP": 0.9,
+                "maxOutputTokens": 32768
+            }
+        }')
     
     local response=$(make_api_request "$json_payload")
     echo "$response" | jq -r '.candidates[0].content.parts[0].text' 2>/dev/null || echo "Error in proofreading"
@@ -786,28 +981,51 @@ compile_manuscript() {
     echo ""
     echo "📁 Available book directories:"
     
-    BOOK_DIRS=($(ls -d ./book_outputs/book_outline_* 2>/dev/null))
+    # Look for all types of book directories
+    OLD_BOOK_DIRS=($(ls -d ./book_outputs/book_outline_* 2>/dev/null))
+    NEW_BOOK_DIRS=($(ls -d ./book_outputs/*-[0-9]*_[0-9]* 2>/dev/null))
+    # Dynamic directories with sanitized topic names (format: topic-YYYYMMDD_HHMMSS)
+    TOPIC_DIRS=($(ls -d ./book_outputs/*-2*_*_* 2>/dev/null))
     
-    if [ ${#BOOK_DIRS[@]} -eq 0 ]; then
+    declare -a ALL_BOOK_DIRS
+    
+    # Add old format directories
+    for dir in "${OLD_BOOK_DIRS[@]}"; do
+        ALL_BOOK_DIRS+=("$dir")
+    done
+    
+    # Add new format directories
+    for dir in "${NEW_BOOK_DIRS[@]}"; do
+        ALL_BOOK_DIRS+=("$dir")
+    done
+    
+    # Add topic-based dynamic directories
+    for dir in "${TOPIC_DIRS[@]}"; do
+        if [[ ! " ${ALL_BOOK_DIRS[*]} " =~ " ${dir} " ]]; then
+            ALL_BOOK_DIRS+=("$dir")
+        fi
+    done
+    
+    if [ ${#ALL_BOOK_DIRS[@]} -eq 0 ]; then
         echo "❌ No book directories found"
         return 1
     fi
     
-    for i in "${!BOOK_DIRS[@]}"; do
-        DIR_NAME=$(basename "${BOOK_DIRS[$i]}")
-        CHAPTER_COUNT=$(ls "${BOOK_DIRS[$i]}"/chapter_*.md 2>/dev/null | wc -l)
+    for i in "${!ALL_BOOK_DIRS[@]}"; do
+        DIR_NAME=$(basename "${ALL_BOOK_DIRS[$i]}")
+        CHAPTER_COUNT=$(ls "${ALL_BOOK_DIRS[$i]}"/chapter_*.md 2>/dev/null | wc -l)
         echo "   $((i+1))) $DIR_NAME ($CHAPTER_COUNT chapters)"
     done
     
     echo ""
-    read -p "Select directory (1-${#BOOK_DIRS[@]}): " dir_choice
+    read -p "Select directory (1-${#ALL_BOOK_DIRS[@]}): " dir_choice
     
-    if [[ ! "$dir_choice" =~ ^[0-9]+$ ]] || [ "$dir_choice" -lt 1 ] || [ "$dir_choice" -gt "${#BOOK_DIRS[@]}" ]; then
+    if [[ ! "$dir_choice" =~ ^[0-9]+$ ]] || [ "$dir_choice" -lt 1 ] || [ "$dir_choice" -gt "${#ALL_BOOK_DIRS[@]}" ]; then
         echo "❌ Invalid selection"
         return 1
     fi
     
-    SELECTED_DIR="${BOOK_DIRS[$((dir_choice-1))]}"
+    SELECTED_DIR="${ALL_BOOK_DIRS[$((dir_choice-1))]}"
     
     echo ""
     echo "📄 Choose chapter version:"
@@ -838,7 +1056,7 @@ compile_manuscript() {
 suggest_topics() {
     loading_dots 6 "➡️  📚 Generating 5 book topic suggestions"
     CURRENT_DATE=$(date +"%B %Y")
-    SUGGESTION_PROMPT="Search the internet, research and provide 5 detailed book suggestions based on the following criteria:
+    SUGGESTION_PROMPT="Search the internet, research and collect 20 potential book topics, then randomly select 5 to provide detailed book suggestions based on the following criteria:
 - Topics and genres with demand and less saturation (e.g., from Kindle Direct Publishing trends).
 - Topics that solve narrowly defined reader problems, pain points, or frustrations.
 - Current ($CURRENT_DATE) in-demand topics with a high probability of success and low risk of failure.
@@ -854,7 +1072,21 @@ Each suggestion MUST include these details in a structured format for EACH book:
 
 Important: Format your response as a numbered list 1-5, with each book having clear Title, Genre, Target Audience, Style and Tone. Do NOT include any text before or after the list."
     ESCAPED_SUGGESTION_PROMPT=$(escape_json "$SUGGESTION_PROMPT")
-    SUGGESTION_JSON_PAYLOAD='{"contents":[{"parts":[{"text":"'"$ESCAPED_SUGGESTION_PROMPT"'"}]}],"generationConfig":{"temperature":0.7,"topK":40,"topP":0.95,"maxOutputTokens":1500}}'
+    SUGGESTION_JSON_PAYLOAD=$(jq -n \
+        --arg prompt "$SUGGESTION_PROMPT" \
+        '{
+            "contents": [{
+                "parts": [{
+                    "text": $prompt
+                }]
+            }],
+            "generationConfig": {
+                "temperature": 0.7,
+                "topK": 40,
+                "topP": 0.95,
+                "maxOutputTokens": 1500
+            }
+        }')
     RESPONSE=$(make_api_request "$SUGGESTION_JSON_PAYLOAD")
 
     if [ $? -ne 0 ]; then
