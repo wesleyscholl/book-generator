@@ -16,7 +16,7 @@ MIN_WORDS=2000
 MAX_WORDS=2500
 WRITING_STYLE="detailed"
 TONE="professional"
-DELAY_BETWEEN_CHAPTERS=15  # Seconds to avoid rate limits
+DELAY_BETWEEN_CHAPTERS=30  # Seconds to avoid rate limits
 OUTLINE_ONLY=false
 CHAPTERS_ONLY=""
 
@@ -67,6 +67,11 @@ PLAGIARISM CHECKING EXAMPLES:
     $0 "Book Topic" "Genre" "Audience" --plagiarism-strict
     $0 "Book Topic" "Genre" "Audience" --plagiarism-threshold 8
     $0 "Book Topic" "Genre" "Audience" --no-plagiarism-check
+
+API RATE LIMITING:
+    --reset-api-tracking        Reset API call counters to zero
+    
+    Rate limits: 15 requests per minute, 1,500 requests per day
 EOF
 }
 
@@ -118,7 +123,9 @@ $chapter_content"
 
     local escaped_prompt=$(escape_json "$check_prompt")
     
-    local json_payload=$(jq -n \
+    # Adding error handling for JSON payload creation
+    local json_payload=""
+    json_payload=$(jq -n \
         --arg prompt "$check_prompt" \
         '{
             "contents": [{
@@ -132,26 +139,91 @@ $chapter_content"
                 "topP": 0.9,
                 "maxOutputTokens": 4096
             }
-        }')
+        }' 2>/dev/null)
+        
+    # Check if JSON payload was created successfully
+    if [ $? -ne 0 ] || [ -z "$json_payload" ]; then
+        echo "❌ Failed to create JSON payload for plagiarism check"
+        return 1
+    fi
 
-    local response=$(make_api_request "$json_payload")
+    # Make API request with better error handling
+    local response=""
+    local max_retries=2
+    local retry_count=0
+    local success=false
     
-    if [ $? -ne 0 ]; then
+    while [ $retry_count -lt $max_retries ] && [ "$success" = false ]; do
+        response=$(make_api_request "$json_payload")
+        local api_result=$?
+        
+        # Check if API call was successful and response is valid JSON
+        if [ $api_result -eq 0 ] && echo "$response" | jq -e '.' > /dev/null 2>&1; then
+            success=true
+        else
+            retry_count=$((retry_count + 1))
+            if [ $retry_count -lt $max_retries ]; then
+                echo "⚠️ API request failed, retrying ($retry_count/$max_retries)..."
+                sleep 5 # Add delay between retries
+            else
+                echo "❌ Maximum retries reached, giving up"
+            fi
+        fi
+    done
+    
+    if [ "$success" = false ]; then
         echo "❌ Plagiarism check failed for Chapter $chapter_num"
         return 1
     fi
 
-    local check_result=$(echo "$response" | jq -r '.candidates[0].content.parts[0].text')
+    # Extract text content with error handling
+    local check_result=""
+    if echo "$response" | jq -e '.candidates[0].content.parts[0].text' > /dev/null 2>&1; then
+        check_result=$(echo "$response" | jq -r '.candidates[0].content.parts[0].text')
+    else
+        echo "❌ Failed to extract content from API response"
+        return 1
+    fi
+    
+    # Make sure we have valid content
+    if [ -z "$check_result" ] || [ "$check_result" = "null" ]; then
+        echo "❌ Empty plagiarism check result for Chapter $chapter_num"
+        return 1
+    fi
     
     # Save the check result
     local check_report_file="${BOOK_DIR}/chapter_${chapter_num}_plagiarism_report.md"
     echo "$check_result" > "$check_report_file"
     
-    # Parse the results
-    local originality_score=$(echo "$check_result" | grep "ORIGINALITY_SCORE:" | sed 's/ORIGINALITY_SCORE: //')
-    local plagiarism_risk=$(echo "$check_result" | grep "PLAGIARISM_RISK:" | sed 's/PLAGIARISM_RISK: //')
-    local copyright_risk=$(echo "$check_result" | grep "COPYRIGHT_RISK:" | sed 's/COPYRIGHT_RISK: //')
-    local issues_found=$(echo "$check_result" | grep "ISSUES_FOUND:" | sed 's/ISSUES_FOUND: //')
+    # Parse the results with better error handling
+    # First check if jq is available to parse this more reliably
+    if command -v jq &> /dev/null && echo "$check_result" | jq -e '.' > /dev/null 2>&1; then
+        # Try to extract data using jq if response happens to be JSON format
+        local originality_score=$(echo "$check_result" | jq -r '.originality_score // .ORIGINALITY_SCORE // empty' 2>/dev/null)
+        local plagiarism_risk=$(echo "$check_result" | jq -r '.plagiarism_risk // .PLAGIARISM_RISK // empty' 2>/dev/null)
+        local copyright_risk=$(echo "$check_result" | jq -r '.copyright_risk // .COPYRIGHT_RISK // empty' 2>/dev/null)
+        local issues_found=$(echo "$check_result" | jq -r '.issues_found // .ISSUES_FOUND // empty' 2>/dev/null)
+    fi
+    
+    # Fallback to grep extraction if jq didn't work or values are empty
+    if [ -z "$originality_score" ]; then
+        originality_score=$(echo "$check_result" | grep -i "ORIGINALITY_SCORE:" | sed 's/ORIGINALITY_SCORE: //' | grep -o '[0-9]*' | head -1)
+    fi
+    if [ -z "$plagiarism_risk" ]; then
+        plagiarism_risk=$(echo "$check_result" | grep -i "PLAGIARISM_RISK:" | sed 's/PLAGIARISM_RISK: //')
+    fi
+    if [ -z "$copyright_risk" ]; then
+        copyright_risk=$(echo "$check_result" | grep -i "COPYRIGHT_RISK:" | sed 's/COPYRIGHT_RISK: //')
+    fi
+    if [ -z "$issues_found" ]; then
+        issues_found=$(echo "$check_result" | grep -i "ISSUES_FOUND:" | sed 's/ISSUES_FOUND: //')
+    fi
+    
+    # Default values if parsing fails
+    if [ -z "$originality_score" ]; then originality_score=5; fi
+    if [ -z "$plagiarism_risk" ]; then plagiarism_risk="MEDIUM"; fi
+    if [ -z "$copyright_risk" ]; then copyright_risk="MEDIUM"; fi
+    if [ -z "$issues_found" ]; then issues_found="YES"; fi
     
     echo "📊 Plagiarism Check Results for Chapter $chapter_num:"
     echo "   Originality Score: $originality_score/10"
@@ -184,6 +256,30 @@ rewrite_chapter_for_originality() {
     
     echo "🔄 Rewriting Chapter $chapter_num to address originality issues (attempt $attempt)..."
     echo "DEBUG: Starting rewrite_chapter_for_originality for chapter $chapter_num" >&2
+    
+    # Make sure the files exist
+    if [ ! -f "$chapter_file" ]; then
+        echo "❌ Error: Chapter file not found: $chapter_file"
+        return 1
+    fi
+    
+    if [ ! -f "$plagiarism_report" ]; then
+        echo "❌ Error: Plagiarism report not found: $plagiarism_report"
+        # Create a default report to avoid failure
+        echo "ORIGINALITY_SCORE: 5
+PLAGIARISM_RISK: MEDIUM
+COPYRIGHT_RISK: MEDIUM
+ISSUES_FOUND: YES
+
+DETAILED_ANALYSIS:
+The content needs to be rewritten to improve originality.
+
+FLAGGED_SECTIONS:
+General structure and examples need rework.
+
+RECOMMENDATIONS:
+Rewrite with more unique examples and phrasing." > "$plagiarism_report"
+    fi
     
     local original_content=$(cat "$chapter_file")
     local check_analysis=$(cat "$plagiarism_report")
@@ -234,31 +330,90 @@ WRITING GUIDELINES:
 
 Please rewrite the entire chapter with complete originality:"
 
-    local escaped_prompt=$(escape_json "$rewrite_prompt")
+    local max_retries=2
+    local retry_count=0
+    local success=false
     
-    local json_payload=$(jq -n \
-        --arg prompt "$rewrite_prompt" \
-        --arg maxtokens "$MAX_TOKENS" \
-        --arg temperature "$rewrite_temp" \
-        '{
-            "contents": [{
-                "parts": [{
-                    "text": $prompt
-                }]
-            }],
-            "generationConfig": {
-                "temperature": ($temperature | tonumber),
-                "topK": 40,
-                "topP": 0.95,
-                "maxOutputTokens": $maxtokens
-            }
-        }')
-
-    local response=$(make_api_request "$json_payload")
+    while [ $retry_count -lt $max_retries ] && [ "$success" = false ]; do
+        # Create JSON payload with error handling
+        local json_payload=""
+        json_payload=$(jq -n \
+            --arg prompt "$rewrite_prompt" \
+            --arg maxtokens "$MAX_TOKENS" \
+            --arg temperature "$rewrite_temp" \
+            '{
+                "contents": [{
+                    "parts": [{
+                        "text": $prompt
+                    }]
+                }],
+                "generationConfig": {
+                    "temperature": ($temperature | tonumber),
+                    "topK": 40,
+                    "topP": 0.95,
+                    "maxOutputTokens": $maxtokens
+                }
+            }' 2>/dev/null)
+            
+        if [ $? -ne 0 ] || [ -z "$json_payload" ]; then
+            echo "❌ Failed to create JSON payload for rewriting"
+            retry_count=$((retry_count + 1))
+            continue
+        fi
+        
+        # Make API request with better error handling
+        local response=""
+        response=$(make_api_request "$json_payload")
+        local api_result=$?
+        
+        # Check if API call was successful and response is valid JSON
+        if [ $api_result -eq 0 ] && echo "$response" | jq -e '.' > /dev/null 2>&1; then
+            success=true
+        else
+            retry_count=$((retry_count + 1))
+            if [ $retry_count -lt $max_retries ]; then
+                echo "⚠️ API request failed, retrying ($retry_count/$max_retries)..."
+                sleep 5 # Add delay between retries
+            else
+                echo "❌ Maximum retries reached, giving up"
+            fi
+        fi
+    done
     
-    if [ $? -ne 0 ]; then
-        echo "❌ Chapter rewrite failed"
+    if [ "$success" = false ]; then
+        echo "❌ Chapter rewrite failed after multiple attempts"
         return 1
+    fi
+
+    # Extract text content with error handling
+    local rewritten_content=""
+    if echo "$response" | jq -e '.candidates[0].content.parts[0].text' > /dev/null 2>&1; then
+        rewritten_content=$(echo "$response" | jq -r '.candidates[0].content.parts[0].text')
+    else
+        echo "❌ Failed to extract content from API response"
+        return 1
+    fi
+    
+    # Make sure we have valid content
+    if [ -z "$rewritten_content" ] || [ "$rewritten_content" = "null" ]; then
+        echo "❌ Empty rewrite result for Chapter $chapter_num"
+        return 1
+    fi
+
+    # Check if the rewritten content is significantly different
+    original_hash=$(echo "$original_content" | md5sum | cut -d ' ' -f1)
+    rewritten_hash=$(echo "$rewritten_content" | md5sum | cut -d ' ' -f1)
+    
+    if [ "$original_hash" = "$rewritten_hash" ]; then
+        echo "⚠️ Warning: Rewritten content appears to be identical to original"
+    fi
+    
+    # Check the word count of rewritten content
+    local rewritten_word_count=$(echo "$rewritten_content" | wc -w)
+    if [ "$word_count_ok" = "false" ] && [ $rewritten_word_count -lt 1800 ]; then
+        echo "⚠️ Warning: Rewritten content is still below target word count ($rewritten_word_count words)"
+    else
+        echo "✅ Rewritten word count: $rewritten_word_count words"
     fi
 
     # Save the rewritten chapter
@@ -266,7 +421,7 @@ Please rewrite the entire chapter with complete originality:"
     cp "$chapter_file" "$backup_file"
     echo "📄 Original backed up to: $(basename "$backup_file")"
     
-    echo "$response" | jq -r '.candidates[0].content.parts[0].text' > "$chapter_file"
+    echo "$rewritten_content" > "$chapter_file"
     echo "✅ Chapter $chapter_num rewritten for originality"
     
     return 0
@@ -279,6 +434,12 @@ multi_check_plagiarism() {
     
     echo "🔍 Running comprehensive plagiarism check for Chapter $chapter_num..."
     echo "DEBUG: Starting multi_check_plagiarism for chapter $chapter_num" >&2
+    
+    # Make sure the file exists
+    if [ ! -f "$chapter_file" ]; then
+        echo "❌ Error: Chapter file not found: $chapter_file"
+        return 1
+    fi
     
     # Run initial check without allowing it to exit the script
     set +e # Make sure we don't exit on error
@@ -307,8 +468,9 @@ Rate each paragraph's originality and flag any concerns:
 TEXT TO ANALYZE:
 $chapter_content"
 
-        local escaped_detailed=$(escape_json "$detailed_prompt")
-        local detailed_payload=$(jq -n \
+        # Add error handling for JSON payload creation
+        local detailed_payload=""
+        detailed_payload=$(jq -n \
             --arg prompt "$detailed_prompt" \
             '{
                 "contents": [{
@@ -322,16 +484,57 @@ $chapter_content"
                     "topP": 0.8,
                     "maxOutputTokens": 4096
                 }
-            }')
-
-        local detailed_response=$(make_api_request "$detailed_payload")
-        local detailed_analysis=$(echo "$detailed_response" | jq -r '.candidates[0].content.parts[0].text')
-        
-        # Save detailed analysis
-        echo "$detailed_analysis" > "${BOOK_DIR}/chapter_${chapter_num}_detailed_analysis.md"
-        echo "📋 Detailed analysis saved"
+            }' 2>/dev/null)
+            
+        if [ $? -ne 0 ] || [ -z "$detailed_payload" ]; then
+            echo "❌ Failed to create JSON payload for detailed analysis"
+        else
+            local max_retries=2
+            local retry_count=0
+            local success=false
+            local detailed_response=""
+            
+            while [ $retry_count -lt $max_retries ] && [ "$success" = false ]; do
+                detailed_response=$(make_api_request "$detailed_payload")
+                local api_result=$?
+                
+                if [ $api_result -eq 0 ] && echo "$detailed_response" | jq -e '.' > /dev/null 2>&1; then
+                    success=true
+                else
+                    retry_count=$((retry_count + 1))
+                    if [ $retry_count -lt $max_retries ]; then
+                        echo "⚠️ Detailed analysis API request failed, retrying ($retry_count/$max_retries)..."
+                        sleep 3
+                    else
+                        echo "❌ Maximum retries reached for detailed analysis"
+                    fi
+                fi
+            done
+            
+            if [ "$success" = true ]; then
+                # Check if the response is valid JSON before trying to parse it
+                local detailed_analysis=""
+                if echo "$detailed_response" | jq -e '.candidates[0].content.parts[0].text' > /dev/null 2>&1; then
+                    detailed_analysis=$(echo "$detailed_response" | jq -r '.candidates[0].content.parts[0].text')
+                
+                    # Save detailed analysis
+                    if [ -n "$detailed_analysis" ] && [ "$detailed_analysis" != "null" ]; then
+                        echo "$detailed_analysis" > "${BOOK_DIR}/chapter_${chapter_num}_detailed_analysis.md"
+                        echo "📋 Detailed analysis saved"
+                    else
+                        echo "⚠️ Failed to extract detailed analysis content"
+                    fi
+                else
+                    echo "⚠️ Invalid JSON structure in API response for detailed analysis"
+                fi
+            fi
+        fi
     fi
     
+    # We need to explicitly return the result as a number
+    echo "DEBUG: multi_check_plagiarism returning $initial_result" >&2
+    
+    # This is the line that had the syntax error - make sure it's properly closed
     return $initial_result
 }
 
@@ -344,6 +547,190 @@ MAGENTA='\033[0;35m'
 CYAN='\033[0;36m'
 WHITE='\033[1;37m'
 RESET='\033[0m'
+
+# Rate limiting variables
+API_CALLS_FILE="/tmp/book_generator_api_calls.txt"
+API_CALLS_TODAY_FILE="/tmp/book_generator_api_calls_today.txt"
+MAX_CALLS_PER_MINUTE=15
+MAX_CALLS_PER_DAY=1500
+MINUTE_INTERVAL=60  # Seconds in a minute
+DAY_INTERVAL=86400  # Seconds in a day
+CURRENT_DAY=$(date +%Y-%m-%d)
+
+# Initialize API call tracking files if they don't exist
+initialize_api_tracking() {
+    # Initialize or validate the minute tracking file
+    if [ ! -f "$API_CALLS_FILE" ]; then
+        # Create the file with initial timestamp and counter
+        echo "$(date +%s) 0" > "$API_CALLS_FILE"
+    fi
+    
+    # Initialize or validate the daily tracking file
+    if [ ! -f "$API_CALLS_TODAY_FILE" ]; then
+        echo "$CURRENT_DAY 0" > "$API_CALLS_TODAY_FILE"
+    else
+        # Check if the day has changed
+        local stored_day=$(cat "$API_CALLS_TODAY_FILE" | cut -d' ' -f1)
+        if [ "$stored_day" != "$CURRENT_DAY" ]; then
+            # Reset for a new day
+            echo "$CURRENT_DAY 0" > "$API_CALLS_TODAY_FILE"
+        fi
+    fi
+}
+
+# Reset API call tracking counters to zero
+reset_api_tracking() {
+    local current_timestamp=$(date +%s)
+    
+    # Reset minute counter
+    echo "$current_timestamp 0" > "$API_CALLS_FILE"
+    
+    # Reset daily counter
+    echo "$CURRENT_DAY 0" > "$API_CALLS_TODAY_FILE"
+    
+    echo -e "${GREEN}✓${RESET} API tracking counters have been reset to zero."
+    show_api_usage
+}
+
+# Animation function for waiting periods
+show_wait_animation() {
+    local wait_time=$1
+    local message=$2
+    local animation_chars=("⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏")
+    local i=0
+    local start_time=$(date +%s)
+    local end_time=$((start_time + wait_time))
+    local current_time=$start_time
+    
+    # Hide cursor
+    echo -en "\033[?25l"
+    
+    while [ $current_time -lt $end_time ]; do
+        local remaining=$((end_time - current_time))
+        local char="${animation_chars[$i]}"
+        echo -ne "\r${CYAN}${char}${RESET} ${message} (${YELLOW}${remaining}s${RESET} remaining)     "
+        i=$(((i + 1) % ${#animation_chars[@]}))
+        sleep 0.1
+        current_time=$(date +%s)
+    done
+    
+    # Show cursor and clear line
+    echo -e "\r\033[K${GREEN}✓${RESET} ${message} completed!     "
+    echo -en "\033[?25h"
+}
+
+# Function to show API usage dashboard
+show_api_usage() {
+    initialize_api_tracking
+    
+    local current_timestamp=$(date +%s)
+    local minute_ago=$((current_timestamp - MINUTE_INTERVAL))
+    
+    # Read the minute tracking file
+    local timestamp_and_count=$(cat "$API_CALLS_FILE")
+    local last_timestamp=$(echo "$timestamp_and_count" | cut -d' ' -f1)
+    local minute_count=$(echo "$timestamp_and_count" | cut -d' ' -f2)
+    
+    # Read the day tracking file
+    local day_and_count=$(cat "$API_CALLS_TODAY_FILE")
+    local day_count=$(echo "$day_and_count" | cut -d' ' -f2)
+    
+    # Calculate time since first call in this minute window
+    local time_since_first_call=$((current_timestamp - last_timestamp))
+    local minute_reset_in=$((MINUTE_INTERVAL - time_since_first_call))
+    
+    # Calculate percentages
+    local minute_percent=$((minute_count * 100 / MAX_CALLS_PER_MINUTE))
+    local day_percent=$((day_count * 100 / MAX_CALLS_PER_DAY))
+    
+    # Draw ASCII progress bars
+    draw_progress_bar() {
+        local percent=$1
+        local width=20
+        local filled=$((percent * width / 100))
+        local empty=$((width - filled))
+        
+        printf "["
+        printf "%${filled}s" | tr ' ' '='
+        printf "%${empty}s" | tr ' ' ' '
+        printf "] %d%%" "$percent"
+    }
+    
+    echo -e "\n${CYAN}════════════════ API USAGE DASHBOARD ════════════════${RESET}"
+    
+    # Per-minute usage
+    echo -e "${YELLOW}Per-Minute Usage:${RESET} $minute_count/$MAX_CALLS_PER_MINUTE calls"
+    echo -n "  "
+    draw_progress_bar $minute_percent
+    echo -e " (resets in ${minute_reset_in}s)"
+    
+    # Daily usage
+    echo -e "${YELLOW}Daily Usage:${RESET} $day_count/$MAX_CALLS_PER_DAY calls"
+    echo -n "  "
+    draw_progress_bar $day_percent
+    echo -e " (resets at midnight)"
+    
+    echo -e "${CYAN}════════════════════════════════════════════════${RESET}\n"
+}
+
+# Check rate limits and calculate necessary delay
+check_rate_limits() {
+    initialize_api_tracking
+    
+    local current_timestamp=$(date +%s)
+    local minute_ago=$((current_timestamp - MINUTE_INTERVAL))
+    
+    # Read the minute tracking file
+    local timestamp_and_count=$(cat "$API_CALLS_FILE")
+    local last_timestamp=$(echo "$timestamp_and_count" | cut -d' ' -f1)
+    local minute_count=$(echo "$timestamp_and_count" | cut -d' ' -f2)
+    
+    # Read the day tracking file
+    local day_and_count=$(cat "$API_CALLS_TODAY_FILE")
+    local day_count=$(echo "$day_and_count" | cut -d' ' -f2)
+    
+    # Check if minute interval has passed
+    if [ "$last_timestamp" -lt "$minute_ago" ]; then
+        # More than a minute has passed, reset minute counter
+        echo "$current_timestamp 1" > "$API_CALLS_FILE"
+        minute_count=1
+    else
+        # Increment the minute counter
+        minute_count=$((minute_count + 1))
+        echo "$last_timestamp $minute_count" > "$API_CALLS_FILE"
+    fi
+    
+    # Increment the day counter
+    day_count=$((day_count + 1))
+    echo "$CURRENT_DAY $day_count" > "$API_CALLS_TODAY_FILE"
+    
+    # Calculate delay if we're over the per-minute limit
+    local minute_delay=0
+    if [ "$minute_count" -gt "$MAX_CALLS_PER_MINUTE" ]; then
+        # Calculate time to wait until the minute rolls over
+        local time_since_first_call=$((current_timestamp - last_timestamp))
+        minute_delay=$((MINUTE_INTERVAL - time_since_first_call + 1))
+        
+        if [ "$minute_delay" -lt 1 ]; then
+            minute_delay=1
+        fi
+        
+        echo "⚠️ Per-minute rate limit reached ($minute_count/$MAX_CALLS_PER_MINUTE calls)"
+        # Show usage stats when we hit limits
+        show_api_usage
+    fi
+    
+    # Check if we're over the daily limit
+    if [ "$day_count" -gt "$MAX_CALLS_PER_DAY" ]; then
+        echo "❌ Daily rate limit exceeded! ($day_count/$MAX_CALLS_PER_DAY calls)"
+        echo "Daily API call limit has been reached. Please try again tomorrow."
+        return 1
+    fi
+    
+    # Return the delay needed
+    echo "$minute_delay"
+    return 0
+}
 
 # Function for classic loading dots
 loading_dots() {
@@ -621,7 +1008,7 @@ trap 'echo "DEBUG: Error at line $LINENO: Command \"$BASH_COMMAND\" exited with 
 set +e
 
 # Debug, echo all passed parameters
-echo "Debug: Arguments passed: $@"
+echo "Debug: Arguments passed: $@" >&2
 
 # Store all arguments for processing
 ALL_ARGS=("$@")
@@ -740,6 +1127,10 @@ while [ $i -lt ${#ALL_ARGS[@]} ]; do
             show_help
             exit 0
             ;;
+        --reset-api-tracking)
+            reset_api_tracking
+            exit 0
+            ;;
         -*|--*)
             echo "Unknown option: ${ALL_ARGS[$i]}"
             exit 1
@@ -764,7 +1155,7 @@ for arg in "${ALL_ARGS[@]}"; do
 done
 
 # Debugging output to verify OUTLINE_ONLY
-echo "Debug: OUTLINE_ONLY is set to: $OUTLINE_ONLY"
+echo "Debug: OUTLINE_ONLY is set to: $OUTLINE_ONLY" >&2
 # Validate API key
 if [ -z "$API_KEY" ]; then
     echo "❌ Error: GEMINI_API_KEY environment variable not set"
@@ -798,6 +1189,10 @@ echo ""
 # API configuration
 API_URL="https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent"
 
+# Initialize API tracking and show dashboard
+initialize_api_tracking
+show_api_usage
+
 # Utility function to escape JSON strings properly
 escape_json() {
     # Use jq to properly escape JSON strings
@@ -819,8 +1214,8 @@ escape_json_manual() {
 # Function to validate JSON payload
 validate_json_payload() {
     if ! echo "$1" | jq -e '.' > /dev/null 2>&1; then
-        echo "Debug: Invalid JSON payload:"
-        echo "$1" | head -n 20  # Show first 20 lines for debugging
+        echo "Debug: Invalid JSON payload:" >&2
+        echo "$1" | head -n 20 >&2
         return 1
     fi
     return 0
@@ -1048,8 +1443,8 @@ echo "Debug: OUTLINE_CONTENT in --chapters-only mode:" >> debug.log
 echo "$OUTLINE_CONTENT" | head -n 10 >> debug.log  # Log first 10 lines for context
 
 # Debugging: Add trace for final draft step
-echo "Debug: Starting final draft step with OUTLINE_CONTENT:"
-echo "$OUTLINE_CONTENT" | head -n 10  # Show first 10 lines for context
+echo "Debug: Starting final draft step with OUTLINE_CONTENT:" >> debug.log
+echo "$OUTLINE_CONTENT" | head -n 10 >> debug.log  # Show first 10 lines for context
 
 # Debugging: Add trace for chapter generation
 CHAPTERS_INFO=$(extract_chapters "$OUTLINE_FILE")
@@ -1065,28 +1460,137 @@ fi
 make_api_request() {
     local payload="$1"
     local function_caller=${FUNCNAME[1]}
-    local response
+    local response=""
+    local max_retries=3
+    local retry_count=0
+    local base_wait_time=2
     
     echo "DEBUG: make_api_request called from $function_caller" >&2
     
-    response=$(curl -s -X POST \
-        -H "Content-Type: application/json" \
-        -H "x-goog-api-key: $API_KEY" \
-        -d "$payload" \
-        "$API_URL")
-
-    echo "Debug: Raw API response:" >> debug.log
-    echo "$response" >> debug.log
-
-    if echo "$response" | jq -e '.error' > /dev/null 2>&1; then
-        echo "❌ API Error:"
-        echo "$response" | jq '.error'
-        echo "DEBUG: make_api_request error detected, returning 1" >&2
+    # Validate that payload is valid JSON before sending
+    if ! echo "$payload" | jq -e '.' > /dev/null 2>&1; then
+        echo "❌ Invalid JSON payload"
+        echo "DEBUG: make_api_request invalid payload, returning 1" >&2
         return 1
     fi
     
-    echo "DEBUG: make_api_request returning successfully" >&2
-    echo "$response"
+    # Check rate limits and get necessary delay time
+    local rate_delay=$(check_rate_limits)
+    local rate_status=$?
+    
+    # If we hit the daily limit, exit
+    if [ $rate_status -ne 0 ]; then
+        echo "DEBUG: make_api_request daily rate limit reached, returning 1" >&2
+        return 1
+    fi
+    
+    # If we need to wait due to rate limiting
+    if [ "$rate_delay" -gt 0 ]; then
+        show_wait_animation "$rate_delay" "Waiting for rate limit"
+    fi
+    
+    while [ $retry_count -lt $max_retries ]; do
+        # Show animation for API call
+        echo -ne "\r${CYAN}⚡${RESET} Making API request... "
+        
+        # Make the API request
+        response=$(curl -s -X POST \
+            -H "Content-Type: application/json" \
+            -H "x-goog-api-key: $API_KEY" \
+            -d "$payload" \
+            -w "\n%{http_code}" \
+            "$API_URL")
+            
+        # Extract HTTP status code from response
+        local http_code=$(echo "$response" | tail -n1)
+        local json_response=$(echo "$response" | sed '$d')
+        
+        # Clear the animation line
+        echo -e "\r\033[K"
+        
+        echo "Debug: Raw API response (HTTP $http_code):" >> debug.log
+        echo "$json_response" >> debug.log
+        
+        # Calculate current usage statistics for display
+        local minute_usage=$(cat "$API_CALLS_FILE" | cut -d' ' -f2)
+        local day_usage=$(cat "$API_CALLS_TODAY_FILE" | cut -d' ' -f2)
+        echo -e "${BLUE}ℹ️${RESET} API Usage: ${minute_usage}/${MAX_CALLS_PER_MINUTE} per minute, ${day_usage}/${MAX_CALLS_PER_DAY} per day"
+        
+        # Check for rate limiting (HTTP 429 - Too Many Requests)
+        if [ "$http_code" = "429" ]; then
+            retry_count=$((retry_count + 1))
+            if [ $retry_count -lt $max_retries ]; then
+                local wait_time=$((base_wait_time * 2 ** retry_count))  # Exponential backoff
+                echo "⚠️ Rate limited by server. Retrying after cooldown (Attempt $retry_count/$max_retries)"
+                show_wait_animation "$wait_time" "Rate limit cooldown"
+                continue
+            else
+                echo "❌ Rate limit exceeded after $max_retries attempts"
+                echo "DEBUG: make_api_request rate limit error, returning 1" >&2
+                return 1
+            fi
+        fi
+        
+        # Check for other HTTP errors
+        if [ "$http_code" != "200" ]; then
+            retry_count=$((retry_count + 1))
+            if [ $retry_count -lt $max_retries ]; then
+                local wait_time=$((base_wait_time * 2 ** retry_count))  # Exponential backoff
+                echo "⚠️ HTTP error $http_code. Retrying after delay (Attempt $retry_count/$max_retries)"
+                show_wait_animation "$wait_time" "Error recovery delay"
+                continue
+            else
+                echo "❌ HTTP error $http_code after $max_retries attempts"
+                echo "DEBUG: make_api_request HTTP error $http_code, returning 1" >&2
+                return 1
+            fi
+        fi
+        
+        # Check if the response is valid JSON
+        if ! echo "$json_response" | jq -e '.' > /dev/null 2>&1; then
+            retry_count=$((retry_count + 1))
+            if [ $retry_count -lt $max_retries ]; then
+                local wait_time=$((base_wait_time * retry_count))
+                echo "⚠️ Invalid JSON response. Retrying after delay (Attempt $retry_count/$max_retries)"
+                show_wait_animation "$wait_time" "Error recovery delay"
+                continue
+            else
+                echo "❌ Invalid JSON response after $max_retries attempts"
+                echo "DEBUG: make_api_request invalid JSON response, returning 1" >&2
+                return 1
+            fi
+        fi
+        
+        # Check for API error in response
+        if echo "$json_response" | jq -e '.error' > /dev/null 2>&1; then
+            local error_message=$(echo "$json_response" | jq -r '.error.message')
+            local error_code=$(echo "$json_response" | jq -r '.error.code')
+            
+            retry_count=$((retry_count + 1))
+            if [ $retry_count -lt $max_retries ]; then
+                local wait_time=$((base_wait_time * retry_count))
+                echo "⚠️ API error ($error_code): $error_message (Attempt $retry_count/$max_retries)"
+                show_wait_animation "$wait_time" "API error recovery"
+                continue
+            else
+                echo "❌ API error after $max_retries attempts:"
+                echo "$json_response" | jq '.error'
+                echo "DEBUG: make_api_request API error detected, returning 1" >&2
+                return 1
+            fi
+        fi
+        
+        # If we got here, the request was successful
+        echo -e "${GREEN}✓${RESET} API request successful!"
+        echo "DEBUG: make_api_request returning successfully" >&2
+        echo "$json_response"
+        return 0
+    done
+    
+    # This should not be reached, but just in case
+    echo "❌ API request failed after $max_retries attempts"
+    echo "DEBUG: make_api_request reached unexpected end, returning 1" >&2
+    return 1
 }
 
 # Extract chapters from outline
@@ -1162,7 +1666,7 @@ for CHAPTER_LINE in "${CHAPTER_LINES[@]}"; do
     # Collect existing chapters for context
     EXISTING_CHAPTERS=""
     for i in $(seq 1 $((CHAPTER_NUM - 1))); do
-        echo "Debug: Collecting existing chapter $i for context"
+        echo "Debug: Collecting existing chapter $i for context" >&2
         CHAPTER_FILE="${BOOK_DIR}/chapter_${i}.md"
         if [ -f "$CHAPTER_FILE" ]; then
             CHAPTER_CONTENT=$(cat "$CHAPTER_FILE")
@@ -1172,7 +1676,7 @@ for CHAPTER_LINE in "${CHAPTER_LINES[@]}"; do
 
     # Style and tone instructions
     get_style_instructions() {
-        echo "Debug: Getting style instructions for chapter $CHAPTER_NUM"
+        echo "Debug: Getting style instructions for chapter $CHAPTER_NUM" >&2
         case $WRITING_STYLE in
             detailed)
                 echo "Write comprehensive, in-depth content with thorough explanations, multiple examples, and detailed analysis."
@@ -1207,7 +1711,7 @@ for CHAPTER_LINE in "${CHAPTER_LINES[@]}"; do
         esac
     }
 
-    echo "Debug: Getting style and tone instructions for chapter $CHAPTER_NUM"
+    echo "Debug: Getting style and tone instructions for chapter $CHAPTER_NUM" >&2
     STYLE_INSTRUCTIONS=$(get_style_instructions)
     TONE_INSTRUCTIONS=$(get_tone_instructions)
 
@@ -1512,8 +2016,8 @@ Please focus on:
     # Rate limiting delay (except for last chapter)
     # Check if we have more chapters and this isn't the last one
     if [ ${#CHAPTER_LINES[@]} -gt 0 ] && [ -n "${CHAPTER_LINES[-1]}" ] && [ "$CHAPTER_NUM" != "$(echo "${CHAPTER_LINES[-1]}" | cut -d'|' -f1 2>/dev/null || echo "")" ]; then
-        echo "⏳ Waiting ${DELAY_BETWEEN_CHAPTERS}s before next chapter..."
-        sleep $DELAY_BETWEEN_CHAPTERS
+        echo "⏳ Waiting between chapters to avoid API rate limits..."
+        show_wait_animation "$DELAY_BETWEEN_CHAPTERS" "Chapter cooldown"
     fi
 done
 
