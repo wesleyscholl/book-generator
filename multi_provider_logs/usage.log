@@ -1,0 +1,5 @@
+2025-08-17 23:17:43,ollama:llama3.2,error
+2025-08-17 23:17:44,ollama:qwen2.5,error
+2025-08-17 23:17:45,ollama:gemma2,error
+2025-08-17 23:17:46,gemini:gemini-1.5-flash-latest,error
+2025-08-17 23:17:48,groq:llama-3.1-8b-instant,success

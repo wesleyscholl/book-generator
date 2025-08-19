@@ -5,6 +5,10 @@
 
 set -e
 
+# Start timer for job duration tracking
+START_TIME=$(date +%s)
+echo "⏱️ Job started at $(date '+%Y-%m-%d %H:%M:%S')"
+
 API_KEY="${GEMINI_API_KEY}"
 MODEL="gemini-1.5-flash-latest"
 API_URL="https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent"
@@ -153,7 +157,7 @@ configure_settings() {
     echo "   API Key: ${GEMINI_API_KEY:+Set}${GEMINI_API_KEY:-Not Set}"
     echo "   Model: ${BOOK_MODEL:-gemini-1.5-flash-latest}"
     echo "   Temperature: ${BOOK_TEMPERATURE:-0.8}"
-    echo "   Words per chapter: ${BOOK_MIN_WORDS:-2000}-${BOOK_MAX_WORDS:-2500}"
+    echo "   Words per chapter: ${BOOK_MIN_WORDS:-1500}-${BOOK_MAX_WORDS:-2000}"
     echo "   Style: ${BOOK_STYLE:-detailed}"
     echo "   Tone: ${BOOK_TONE:-professional}"
     echo ""
@@ -345,7 +349,6 @@ generate_complete_book() {
     
     echo ""
     pulse_text "🚀 Starting complete book generation..."
-    countdown 3 "Beginning in"
     echo "⏰ Started at: $(date)"
 
     # Check if full_book_generator.sh exists
@@ -842,7 +845,7 @@ edit_chapter() {
 - Strengthening character development and dialogue
 - Adding more vivid descriptions where appropriate
 - Maintaining the original story and voice
-- Ensuring 2000-2500 word length
+- Ensuring 1500-2000 word length
 
 Rewrite the chapter with these improvements:
 
@@ -1228,6 +1231,15 @@ main() {
                 show_help
                 ;;
             8)
+                # Calculate and display elapsed time before exiting
+                END_TIME=$(date +%s)
+                ELAPSED_TIME=$((END_TIME - START_TIME))
+                HOURS=$((ELAPSED_TIME / 3600))
+                MINUTES=$(( (ELAPSED_TIME % 3600) / 60 ))
+                SECONDS=$((ELAPSED_TIME % 60))
+                
+                echo ""
+                echo "⏱️ Session duration: ${HOURS}h ${MINUTES}m ${SECONDS}s (started: $(date -r $START_TIME '+%Y-%m-%d %H:%M:%S'), finished: $(date -r $END_TIME '+%Y-%m-%d %H:%M:%S'))"
                 echo "👋 Goodbye! Happy writing!"
                 exit 0
                 ;;
