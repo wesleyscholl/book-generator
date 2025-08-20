@@ -143,6 +143,21 @@ toc-title: "Table of Contents"
 identifier:
   - scheme: ISBN
     text: "${ISBN:-[No ISBN Provided]}"
+header-includes:
+  - \usepackage{titlesec}
+  - \titleformat{\section}[block]{\bfseries\Huge\centering}{}{0pt}{}
+  - \titleformat{\subsection}[block]{\bfseries\Large\centering}{}{0pt}{}
+  - \titleformat{\chapter}[display]
+      {\sffamily\bfseries\Huge} % Sans-serif, bold, large
+      {Chapter \thechapter}
+      {1ex}
+      {}
+  - \titleformat{\section}
+      {\sffamily\bfseries\Large}
+      {\thesection}{1ex}{}
+  - \titleformat{\subsection}
+      {\sffamily\bfseries\large}
+      {\thesubsection}{1ex}{}
 $([ -n "$cover_basename" ] && echo "cover-image: \"$cover_basename\"")
 ...
 EOF
