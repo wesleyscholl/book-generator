@@ -139,25 +139,17 @@ titlepage: false
 rights: "Copyright © $PUBLICATION_YEAR $AUTHOR. All rights reserved."
 language: "en-US"
 publisher: "$PUBLISHER"
-toc-title: "Table of Contents"
 identifier:
   - scheme: ISBN
     text: "${ISBN:-[No ISBN Provided]}"
+classoption: openany
 header-includes:
   - \usepackage{titlesec}
   - \titleformat{\section}[block]{\bfseries\Huge\centering}{}{0pt}{}
   - \titleformat{\subsection}[block]{\bfseries\Large\centering}{}{0pt}{}
-  - \titleformat{\chapter}[display]
-      {\sffamily\bfseries\Huge} % Sans-serif, bold, large
-      {Chapter \thechapter}
-      {1ex}
-      {}
-  - \titleformat{\section}
-      {\sffamily\bfseries\Large}
-      {\thesection}{1ex}{}
-  - \titleformat{\subsection}
-      {\sffamily\bfseries\large}
-      {\thesubsection}{1ex}{}
+  - \let\cleardoublepage\clearpage
+  - \renewcommand{\chapterbreak}{\clearpage}
+  
 $([ -n "$cover_basename" ] && echo "cover-image: \"$cover_basename\"")
 ...
 EOF
@@ -560,132 +552,95 @@ echo "🏢 Publisher: $PUBLISHER"
 # Determine chapter file pattern based on version
 case $VERSION in
     2)
-        CHAPTER_PATTERN="chapter_*_edited.md"
         VERSION_NAME="edited"
-        FALLBACK_PATTERN="chapter_*.md"
         ;;
     3)
-        CHAPTER_PATTERN="chapter_*_final.md"
         VERSION_NAME="final"
-        FALLBACK_PATTERN="chapter_*_edited.md"
-        FALLBACK2_PATTERN="chapter_*.md"
         ;;
     *)
-        CHAPTER_PATTERN="chapter_*.md"
         VERSION_NAME="original"
         ;;
 esac
 
 echo "🔎 Looking for $VERSION_NAME chapters..."
 
-# Find chapter files with fallback logic
-CHAPTER_FILES=()
-
-# Get chapter numbers from outline using a more compatible approach
+# -----------------------------
+# Extract chapter numbers from outline
+# -----------------------------
 echo "🔍 Extracting chapter numbers from outline..."
-CHAPTER_NUMS_LIST=""
-while read -r line; do
-    if [[ "$line" =~ Chapter[[:space:]]+([0-9]+) ]]; then
-        CHAPTER_NUM=${BASH_REMATCH[1]}
-        # Only add if not already in list
-        if [[ ! $CHAPTER_NUMS_LIST =~ (^|,)$CHAPTER_NUM(,|$) ]]; then
-            if [ -z "$CHAPTER_NUMS_LIST" ]; then
-                CHAPTER_NUMS_LIST="$CHAPTER_NUM"
-            else
-                CHAPTER_NUMS_LIST="$CHAPTER_NUMS_LIST,$CHAPTER_NUM"
-            fi
-        fi
-    fi
-done < "$OUTLINE_FILE"
+CHAPTER_NUMS_LIST=$(grep -oE 'Chapter[[:space:]]+[0-9]+' "$OUTLINE_FILE" \
+    | awk '{print $2}' \
+    | sort -n -u | paste -sd, -)
 
-# Count chapters
 CHAPTER_COUNT=$(echo "$CHAPTER_NUMS_LIST" | tr ',' '\n' | wc -l)
 echo "📋 Found $CHAPTER_COUNT chapters in outline"
 
-# Build CHAPTER_FILES in the order specified by the outline (CHAPTER_NUMS_LIST)
+# -----------------------------
+# Build CHAPTER_FILES in outline order
+# -----------------------------
+CHAPTER_FILES=()
 IFS=',' read -r -a OUTLINE_CHAPTERS <<< "$CHAPTER_NUMS_LIST"
+
 for chapter_num in "${OUTLINE_CHAPTERS[@]}"; do
-    chapter_num=$(echo "$chapter_num" | sed 's/^ *//; s/ *$//')
     primary_file=""
+    case $VERSION in
+        3)
+            [[ -f "$BOOK_DIR/chapter_${chapter_num}_final.md" ]] && primary_file="$BOOK_DIR/chapter_${chapter_num}_final.md"
+            ;;
+        2)
+            [[ -f "$BOOK_DIR/chapter_${chapter_num}_edited.md" ]] && primary_file="$BOOK_DIR/chapter_${chapter_num}_edited.md"
+            ;;
+        *)
+            [[ -f "$BOOK_DIR/chapter_${chapter_num}.md" ]] && primary_file="$BOOK_DIR/chapter_${chapter_num}.md"
+            ;;
+    esac
 
-    # Prefer versioned filenames when requested
-    if [ "$VERSION" = "3" ] && [ -f "$BOOK_DIR/chapter_${chapter_num}_final.md" ]; then
-        primary_file="$BOOK_DIR/chapter_${chapter_num}_final.md"
-    elif [ "$VERSION" = "2" ] && [ -f "$BOOK_DIR/chapter_${chapter_num}_edited.md" ]; then
-        primary_file="$BOOK_DIR/chapter_${chapter_num}_edited.md"
-    elif [ -f "$BOOK_DIR/chapter_${chapter_num}.md" ]; then
-        primary_file="$BOOK_DIR/chapter_${chapter_num}.md"
-    fi
-
-    # Fallbacks if primary not found
+    # Fallbacks
     if [ -z "$primary_file" ]; then
-        if [ -f "$BOOK_DIR/chapter_${chapter_num}_edited.md" ]; then
-            primary_file="$BOOK_DIR/chapter_${chapter_num}_edited.md"
-        elif [ -f "$BOOK_DIR/chapter_${chapter_num}_final.md" ]; then
-            primary_file="$BOOK_DIR/chapter_${chapter_num}_final.md"
-        fi
+        for suffix in "_edited" "_final" ""; do
+            candidate="$BOOK_DIR/chapter_${chapter_num}${suffix}.md"
+            if [[ -f "$candidate" && "$candidate" != *"_review.md" && "$candidate" != *"_proofed.md" ]]; then
+                primary_file="$candidate"
+                break
+            fi
+        done
     fi
 
-    if [ -n "$primary_file" ] && [[ -f "$primary_file" && "$primary_file" != *"_review.md" && "$primary_file" != *"_proofed.md" ]]; then
+    if [ -n "$primary_file" ]; then
         CHAPTER_FILES+=("$primary_file")
     else
         echo "⚠️  Warning: Could not find any file for chapter $chapter_num"
     fi
 done
 
-# Sort chapter files numerically by extracting the chapter number
-function extract_chapter_num() {
-    local filename=$(basename "$1")
-    if [[ "$filename" =~ chapter_([0-9]+) ]]; then
-        echo "${BASH_REMATCH[1]}"
-    else
-        echo "0"
-    fi
-}
-
-# Sort chapter files by their numerical order
-SORTED_CHAPTER_FILES=()
-declare -a CHAPTER_NUMS=()
-
-# Extract all chapter numbers first
-for file in "${CHAPTER_FILES[@]}"; do
-    num=$(extract_chapter_num "$file")
-    CHAPTER_NUMS+=("$num")
-done
-
-# Sort chapters by their numeric value
-for i in $(seq 1 1000); do
-    for j in "${!CHAPTER_FILES[@]}"; do
-        file="${CHAPTER_FILES[$j]}"
-        if [ "$(extract_chapter_num "$file")" == "$i" ]; then
-            SORTED_CHAPTER_FILES+=("$file")
-        fi
-    done
-done
-
-# Replace original array with sorted array
-CHAPTER_FILES=("${SORTED_CHAPTER_FILES[@]}")
-
-if [ ${#CHAPTER_FILES[@]} -eq 0 ]; then
+# -----------------------------
+# Sort chapter files numerically (safe for spaces)
+# -----------------------------
+if [ ${#CHAPTER_FILES[@]} -gt 0 ]; then
+    # Sort using IFS=$'\n' and read into a new array
+    IFS=$'\n' sorted=($(printf "%s\n" "${CHAPTER_FILES[@]}" | sort -V))
+    unset IFS
+    CHAPTER_FILES=("${sorted[@]}")
+else
     echo "❌ Error: No chapter files found in $BOOK_DIR"
-    echo "Available files:"
     ls -la "$BOOK_DIR"/*.md 2>/dev/null | head -10
-    
-    # If no chapters found from outline, try autodetecting chapter_<number>.md files
+
+    # Autodetect
     echo "🔄 Trying to autodetect chapter files..."
     for file in "$BOOK_DIR"/chapter_*.md; do
         if [[ -f "$file" && "$file" != *"_review.md" && "$file" != *"_proofed.md" && "$file" != *"_edited.md" && "$file" != *"_final.md" ]]; then
-            if [[ "$(basename "$file")" =~ ^chapter_([0-9]+)\.md$ ]]; then
-                CHAPTER_FILES+=("$file")
-            fi
+            CHAPTER_FILES+=("$file")
         fi
     done
-    
+
     if [ ${#CHAPTER_FILES[@]} -eq 0 ]; then
         echo "❌ Error: No chapter files could be autodetected either"
         exit 1
     else
         echo "✅ Autodetected ${#CHAPTER_FILES[@]} chapter files"
+        IFS=$'\n' sorted=($(printf "%s\n" "${CHAPTER_FILES[@]}" | sort -V))
+        unset IFS
+        CHAPTER_FILES=("${sorted[@]}")
     fi
 fi
 
@@ -695,17 +650,18 @@ for file in "${CHAPTER_FILES[@]}"; do
     echo "   - $(basename "$file")"
 done
 
-# Extract book title from outline
-BOOK_TITLE=$(grep -i -m1 -E "(^#[^#]|title)" "$OUTLINE_FILE" | sed 's/^#*\s*//;s/^[Tt]itle:\s*//' | sed 's/[Bb]ook [Tt]itle://;s/^ *//;s/ *$//' | head -1)
+# -----------------------------
+# Extract book title
+# -----------------------------
+BOOK_TITLE=$(grep -i -m1 -E "(^#[^#]|title)" "$OUTLINE_FILE" \
+    | sed 's/^#*\s*//;s/^[Tt]itle:\s*//;s/[Bb]ook [Tt]itle://;s/^ *//;s/ *$//;s/:.*//;' \
+    | head -1)
+
 if [ -z "$BOOK_TITLE" ]; then
     BOOK_TITLE="Generated Book $(date +%Y-%m-%d)"
 fi
 # Keep any 'Book Title:' prefix as requested; extract subtitle for layout
-SUB_TITLE=""
-if [[ "$BOOK_TITLE" == *":"* ]]; then
-    # preserve full BOOK_TITLE but get substring after first colon as SUB_TITLE
-    SUB_TITLE="$(echo "$BOOK_TITLE" | cut -d ':' -f 2- | sed 's/^ *//; s/ *$//')"
-fi
+SUB_TITLE="$(grep -i -m1 -E "(^#[^#]|title)" "$OUTLINE_FILE" | sed 's/^#*\s*//;s/^[Tt]itle:\s*//;s/[Bb]ook [Tt]itle://;s/^ *//;s/ *$//;' | cut -d ':' -f 2- | head -1)"
 
 # Create manuscript
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
@@ -765,14 +721,17 @@ header-includes:
   - \titleformat{\subsection}[block]{\bfseries\Large\centering}{}{0pt}{}
 ---
 
+\renewcommand{\contentsname}{Table of Contents}
+\thispagestyle{empty}
 \newpage
-
+\thispagestyle{empty}
 \clearpage\vspace*{\fill}
-# $BOOK_TITLE
-$(if [ -n "$SUB_TITLE" ]; then echo "## $SUB_TITLE"; fi)
+# $BOOK_TITLE {.unnumbered .unlisted}
+## $SUB_TITLE
+\vspace{12em}
 
 ## By $AUTHOR
-## $PUBLICATION_YEAR
+## © $PUBLICATION_YEAR
 
 
 $(if [ -f "$EXPORTS_DIR/$LOGO_BASENAME" ]; then echo "## ![]($LOGO_BASENAME){ width=40% } "; fi)
@@ -780,15 +739,13 @@ $(if [ -f "$EXPORTS_DIR/$LOGO_BASENAME" ]; then echo "## ![]($LOGO_BASENAME){ wi
 
 \newpage
 
-$(if [ -f "$EXPORTS_DIR/$LOGO_BASENAME" ]; then echo "![]($LOGO_BASENAME){ width=75% } "; fi)
+\clearpage\vspace*{\fill}
+$(if [ -f "$EXPORTS_DIR/$LOGO_BASENAME" ]; then echo "## ![]($LOGO_BASENAME){ width=75% } "; fi)
 
-**Copyright © $PUBLICATION_YEAR $AUTHOR**
-
-All rights reserved. No part of this publication may be reproduced, distributed, or transmitted in any form or by any means, including photocopying, recording, or other electronic or mechanical methods, without the prior written permission of the publisher.
-
+\centerline{\textbf{Copyright © $PUBLICATION_YEAR $AUTHOR}}
+\centerline{\textbf{$PUBLISHER}}
 $(if [ -n "$ISBN" ]; then echo "ISBN: $ISBN"; fi)
-
-Published by $PUBLISHER
+All rights reserved. No part of this publication may be reproduced, distributed, or transmitted in any form or by any means, including photocopying, recording, or other electronic or mechanical methods, without the prior written permission of the publisher.
 
 \newpage
 
@@ -856,24 +813,70 @@ for CHAPTER_FILE in "${CHAPTER_FILES[@]}"; do
 
     # Process chapter content and clean it, but remove heading lines so we don't duplicate titles
     CHAPTER_CONTENT=$(cat "$CHAPTER_FILE")
-    CLEAN_CONTENT=$(echo "$CHAPTER_CONTENT" | sed -e '/^PLAGIARISM\/COPYRIGHT ANALYSIS:/,/^$/d' \
-                                                -e '/^WRITING GUIDELINES:/,/^$/d' \
-                                                -e '/^\*\*WRITING GUIDELINES:\*\*/,/^$/d' \
-                                                -e '/^DETAILED_ANALYSIS:/,/^$/d' \
-                                                -e '/^FLAGGED_SECTIONS:/,/^$/d' \
-                                                -e '/^RECOMMENDATIONS:/,/^$/d' \
-                                                -e '/^IMPORTANT WORD COUNT REQUIREMENT:/,/^$/d' \
-                                                -e '/^REWRITING REQUIREMENTS:/,/attributed$/d' \
-                                                -e '/\*\*Originality Score:/,/publication\./d' \
-                                                -e '/ORIGINALITY_SCORE:/d' \
-                                                -e '/PLAGIARISM_RISK:/d' \
-                                                -e '/COPYRIGHT_RISK:/d' \
-                                                -e '/ISSUES_FOUND:/d' \
-                                                -e '/^Chapter Rewrite:/d' \
-                                                -e 's/Figure 1: Book Cover//' \
-                                                -e 's/^Chapter Rewrite://' \
-                                                -e '/^Please rewrite the entire chapter/d' )
+    
+    # First pass: Remove all metadata sections with comprehensive pattern matching
+    CLEAN_CONTENT=$(echo "$CHAPTER_CONTENT" | sed -E -i '
+        # Remove standard metadata sections (case insensitive)
+        /(?i)^(PLAGIARISM|COPYRIGHT)[ _\/]*ANALYSIS:?/,/^$/d;
+        /(?i)^(COPYRIGHT|PLAGIARISM)[ _\/]*RISK:?/,/^$/d;
+        /(?i)^FLAGGED[ _]*SECTIONS:?/,/^$/d;
+        /(?i)^(ISSUES|PROBLEMS)[ _]*FOUND:?/,/^$/d;
+        /(?i)^WRITING[ _]*GUIDELINES:?/,/^$/d;
+        /(?i)^DETAILED[ _]*ANALYSIS:?/,/^$/d;
+        /(?i)^RECOMMENDATIONS?:?/,/^$/d;
+        /(?i)^IMPORTANT[ _]*WORD[ _]*COUNT[ _]*REQUIREMENT:?/,/^$/d;
+        /(?i)^REWRITING[ _]*REQUIREMENTS?:?/,/^$/d;
+        /(?i)^The final answer is:/,/^$/d;
+        /(?i)^\**The content needs to be rewritten/,/^$/d;
+        
+        # Remove all variations of markdown-formatted guidelines
+        /(?i)^\*\*WRITING[ _]*GUIDELINES:?\*\*/,/^$/d;
+        /(?i)^\*\*PLAGIARISM[ _\/]*ANALYSIS:?\*\*/,/^$/d;
+        /(?i)^\*\*COPYRIGHT[ _]*ANALYSIS:?\*\*/,/^$/d;
+        /(?i)^\*\*REWRITING[ _]*REQUIREMENTS:?\*\*/,/^$/d;
+        
+        # Remove score and risk indicators
+        /(?i)^ORIGINALITY[ _]*SCORE:?/d;
+        /(?i)^PLAGIARISM[ _]*RISK:?/d;
+        /(?i)^COPYRIGHT[ _]*RISK:?/d;
+        /(?i)^ISSUES[ _]*FOUND:?/d;
+        
+        # Remove chapter rewrite markers
+        /(?i)^Chapter Rewrite:?/d;
+        /(?i)^Please rewrite the entire chapter/d;
+        
+        # Remove specific phrases
+        s/Figure 1: Book Cover//g;
+        
+        # Remove note sections
+        /(?i)^NOTE TO WRITER:?/,/^$/d;
+        /(?i)^STYLE NOTES?:?/,/^$/d;
+        
+        # Remove AI-generated headers
+        /(?i)^AI[ _]*GENERATED[ _]*CONTENT:?/,/^$/d;
+        /(?i)^\*\*AI[ _]*GENERATED[ _]*CONTENT:?\*\*/,/^$/d;
+        /(?i)^Generated with AI/d;
+        /(?i)^This content was generated by/d;
+    ')
 
+    # Second pass: Remove trailing paragraphs that contain rewriting goals or prompt info
+    CLEAN_CONTENT=$(echo "$CLEAN_CONTENT" | sed -E '
+        # Remove common trailing metadata patterns
+        /(?i)^In this chapter(,| we)/,$d;
+        /(?i)^This chapter (meets|follows|adheres to)/,$d;
+        /(?i)^I have (written|created|completed)/,$d;
+        /(?i)^The chapter (now|has been|is) (complete|written)/,$d;
+        /(?i)^Note: This chapter/,$d;
+        /(?i)^Note to editor:/,$d;
+        /(?i)^Next steps:/,$d;
+        /(?i)^Next chapter:/,$d;
+        /(?i)^Word count:/,$d;
+        /(?i)^Chapter length:/,$d;
+        /(?i)^This draft (meets|satisfies|fulfills)/,$d;
+        /(?i)^As requested, this chapter/,$d;
+        /(?i)^END OF CHAPTER/,$d;
+    ')
+    
     # Remove first heading lines if they match common chapter title patterns to avoid duplicates
     FORMATTED_CONTENT=$(echo "$CLEAN_CONTENT" | sed '1,3{/^# /d; /^\*\*/d; /^Chapter [0-9]/d;}' )
 
@@ -986,8 +989,8 @@ EOF
 
 # Add a simple end note to the manuscript instead
 cat << EOF >> "$MANUSCRIPT_FILE"
-
 \newpage
+\section{}
 ---
 
 *Copyright © $PUBLICATION_YEAR $AUTHOR. All rights reserved.*
@@ -997,14 +1000,7 @@ EOF
 # If a back cover was generated, include it as the final page
 if [ -n "$BACK_COVER" ] && [ -f "$BACK_COVER" ]; then
     echo "" >> "$MANUSCRIPT_FILE"
-    echo "\newpage" >> "$MANUSCRIPT_FILE"
     echo "" >> "$MANUSCRIPT_FILE"
-    echo "---
-header-includes:
-  - \pagestyle{fancy}
-  - \fancyhf{}
-  - \cfoot{\thepage}
----"
     echo "![]($(basename "$BACK_COVER"))" >> "$MANUSCRIPT_FILE"
     echo "\thispagestyle{empty}" >> "$MANUSCRIPT_FILE"
     # Copy back cover to exports directory only if different
@@ -1137,9 +1133,9 @@ generate_ebook_format() {
             echo "📄 Generating PDF format..."
             
             # Try direct PDF generation first (simplest approach)
-            (cd "$output_dir" && pandoc -f markdown -t pdf \
+            (cd "$output_dir" && pandoc -f markdown -t pdf --pdf-engine=lualatex \
                 --metadata-file="$(basename "$metadata")" \
-                -o "$(basename "$output_file")" "$(basename "$input_file")") 2>/dev/null && {
+                -o "$(basename "$output_file")" "$(basename "$input_file")") && {
                 echo "✅ PDF created: $(basename "$output_file")"
                 return 0
             }

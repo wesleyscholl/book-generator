@@ -159,35 +159,53 @@ analyze_with_languagetool() {
             }
             END { if (chunk != "") print chunk }
         ' > "$temp_file"
-        
-        # Process each chunk
+
+        # Process each chunk and save individual JSON responses, then merge safely
         local chunk_num=0
-        local all_results=""
-        
+        local tmpdir=$(mktemp -d)
+
         while IFS= read -r chunk; do
             if [ -n "$chunk" ]; then
                 chunk_num=$((chunk_num + 1))
                 [ "$VERBOSE" = true ] && echo -e "${CYAN}📝 Processing chunk $chunk_num...${NC}"
-                
-                local result=$(curl -s -X POST \
+
+                # Use --data-urlencode to ensure proper encoding of arbitrary text
+                curl -s -X POST \
                     -H "Content-Type: application/x-www-form-urlencoded" \
-                    -d "text=$(echo "$chunk" | sed 's/+/%2B/g' | sed 's/ /+/g')" \
-                    -d "language=$LANGUAGE" \
-                    -d "enabledOnly=false" \
-                    "$LANGUAGETOOL_URL")
-                
-                all_results="$all_results$result"
+                    --data-urlencode "text=$chunk" \
+                    --data-urlencode "language=$LANGUAGE" \
+                    --data-urlencode "enabledOnly=false" \
+                    "$LANGUAGETOOL_URL" -o "$tmpdir/result_${chunk_num}.json"
+
+                # If curl failed, capture error and continue
+                if [ $? -ne 0 ]; then
+                    echo -e "${YELLOW}⚠️  Warning: LanguageTool request for chunk $chunk_num failed${NC}"
+                fi
             fi
         done < "$temp_file"
-        
-        echo "$all_results"
+
+        # Merge JSON responses into a single valid JSON object
+        if [ $chunk_num -eq 0 ]; then
+            echo ""
+        elif [ $chunk_num -eq 1 ]; then
+            cat "$tmpdir/result_1.json"
+        else
+            # Combine all .matches arrays into one big matches array and reuse language/software fields from first response
+            jq -s '{
+                language: (.[0].language // "'$LANGUAGE'"),
+                software: (.[0].software // null),
+                matches: (map(.matches) | add)
+            }' "$tmpdir"/result_*.json
+        fi
+
+        rm -rf "$tmpdir"
     else
         # Process normally for shorter text
         curl -s -X POST \
             -H "Content-Type: application/x-www-form-urlencoded" \
-            -d "text=$(echo "$text" | sed 's/+/%2B/g' | sed 's/ /+/g')" \
-            -d "language=$LANGUAGE" \
-            -d "enabledOnly=false" \
+            --data-urlencode "text=$text" \
+            --data-urlencode "language=$LANGUAGE" \
+            --data-urlencode "enabledOnly=false" \
             "$LANGUAGETOOL_URL"
     fi
     

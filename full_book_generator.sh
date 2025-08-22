@@ -20,27 +20,96 @@ else
     MULTI_PROVIDER_ENABLED=false
 fi
 
+# Function to select the optimal model for specific tasks
+select_task_model() {
+    local task_type="$1"
+    local default_model="$2"
+    local length_preference="${3:-medium}"  # small, medium, large
+    
+    case "$task_type" in
+        "chapter_generation")
+            # Use larger models for initial chapter generation
+            if [ "$length_preference" = "large" ]; then
+                echo "llama3.1:8b"  # Largest model for highest quality chapters
+            elif [ "$length_preference" = "medium" ]; then
+                echo "phi4-mini:3.8b"  # Better quality with comparable size to llama3.2:3b
+            else
+                echo "llama3.2:1b"  # Fast generation, decent quality
+            fi
+            ;;
+        "continuation")
+            # Models optimized for continuing existing text - prioritizing speed
+            if [ "$length_preference" = "large" ]; then
+                echo "llama3.2:1b"  # Good balance of speed and quality
+            else
+                echo "phi2:2.7b"  # Fastest model for continuations
+            fi
+            ;;
+        "plagiarism_check")
+            # Analytical models good at comparison/detection
+            echo "gemma3:4b"  # Strong analytical capabilities
+            ;;
+        "quality_check")
+            # Focused on grammar and style
+            echo "phi3:3.8b"  # Better grammar and style understanding
+            ;;
+        "rewrite")
+            # Creative models for rewriting content
+            if [ "$length_preference" = "large" ]; then
+                echo "phi3:3.8b"  # Creative rewriting with strong coherence
+            else
+                echo "granite3-moe:3b"  # Good balance for rewriting
+            fi
+            ;;
+        "section_rewrite")
+            # Models optimized for section-level rewriting
+            echo "phi3:3.8b"  # Excellent for creative rewriting
+            ;;
+        "summary")
+            # Models good at condensing information
+            echo "qwen3:1.7b"  # Efficient summarization
+            ;;
+        "outline")
+            # Strong planning and organizing models
+            echo "gemma2:2b"  # Good for structured content
+            ;;
+        "analytical")
+            # Models good at analytical reasoning
+            echo "phi4-mini-reasoning:3.8b"  # Strong reasoning capabilities
+            ;;
+        "creative")
+            # Models good at creative writing
+            echo "granite3.3:2b"  # Good creative capabilities with fast inference
+            ;;
+        *)
+            # Default to the provided model
+            echo "$default_model"
+            ;;
+    esac
+}
+
 # Default configuration
 API_KEY="${GEMINI_API_KEY}"
 MODEL="gemini-1.5-flash-latest"
-TEMPERATURE=0.8
-TOP_K=50
+TEMPERATURE=0.95
+TOP_K=40
 TOP_P=0.9
-MAX_TOKENS=50000
-MIN_WORDS=1500
-MAX_WORDS=2000
+MAX_TOKENS=8192
+MAX_RETRIES=1
+MIN_WORDS=2000
+MAX_WORDS=2500
 WRITING_STYLE="detailed"
 TONE="professional"
-DELAY_BETWEEN_CHAPTERS=30  # Seconds to avoid rate limits
+DELAY_BETWEEN_CHAPTERS=1  # Seconds to avoid rate limits
 OUTLINE_ONLY=false
 CHAPTERS_ONLY=""
 
 # Plagiarism checking configuration
 ENABLE_PLAGIARISM_CHECK=true
-PLAGIARISM_CHECK_STRICTNESS="medium"  # low, medium, high
+PLAGIARISM_CHECK_STRICTNESS="low"  # low, medium, high
 AUTO_REWRITE_ON_FAIL=true
-ORIGINALITY_THRESHOLD=6  # Minimum score out of 10
-PLAGIARISM_RECHECK_LIMIT=2  # Maximum retries for rewritten content
+ORIGINALITY_THRESHOLD=4  # Minimum score out of 10
+PLAGIARISM_RECHECK_LIMIT=1  # Maximum retries for rewritten content
 
 show_help() {
     cat << EOF
@@ -57,8 +126,8 @@ REQUIRED ARGUMENTS:
 OPTIONS:
     -m, --model MODEL           Gemini model (flash-latest, pro-latest)
     -t, --temperature TEMP      Temperature 0.0-1.0 (default: 0.8)
-    --min-words WORDS          Minimum words per chapter (default: 1500)
-    --max-words WORDS          Maximum words per chapter (default: 2000)
+    --min-words WORDS          Minimum words per chapter (default: 2000)
+    --max-words WORDS          Maximum words per chapter (default: 2500)
     --style STYLE              Writing style: detailed|narrative|academic
     --tone TONE                Tone: professional|casual|authoritative
     --preset PRESET            Use preset: creative|technical|fiction|business
@@ -98,7 +167,8 @@ check_plagiarism_and_copyright() {
     
     echo "🔍 Checking Chapter $chapter_num for plagiarism and copyright issues..."
     echo "DEBUG: Starting plagiarism check function for chapter $chapter_num" >> debug.log
-    
+
+    local check_system_prompt="You are an expert copyright and plagiarism detection system."
     local check_prompt="You are an expert copyright and plagiarism detection system. Analyze the following text for:
 
 1. PLAGIARISM INDICATORS:
@@ -139,7 +209,7 @@ $chapter_content"
     # Make API request using smart multi-provider system
     local response=""
     pulse_animation
-    response=$(smart_api_call "$check_prompt" "plagiarism_check")
+    response=$(smart_api_call "$check_prompt" "$check_system_prompt" "plagiarism_check" "$TEMPERATURE" "$MAX_TOKENS" "$MAX_RETRIES" "gemma3:1b")
     local api_result=$?
     
     if [ $api_result -ne 0 ] || [ -z "$response" ]; then
@@ -235,7 +305,7 @@ rewrite_chapter_for_originality() {
     fi
     
     if [ ! -f "$plagiarism_report" ]; then
-        echo "❌ Error: Plagiarism report not found: $plagiarism_report"
+        echo "⚠️ Plagiarism report not found: $plagiarism_report (creating default)"
         # Create a default report to avoid failure
         echo "ORIGINALITY_SCORE: 5
 PLAGIARISM_RISK: MEDIUM
@@ -265,12 +335,12 @@ Rewrite with more unique examples and phrasing." > "$plagiarism_report"
     if [ "$word_count_ok" = "false" ]; then
         word_count_instruction="IMPORTANT WORD COUNT REQUIREMENT:
 - Current chapter is only $current_word_count words
-- MUST expand to at least 1500 words, preferably 1500-2000 words
+- MUST expand to at least 2000 words, preferably 2000-2500 words
 - Add more examples, detailed explanations, and practical applications
 - Elaborate on each concept with more depth
 - Do not use filler or fluff - all content must be valuable and substantive"
     fi
-    
+    local rewrite_system_prompt="You are an expert author tasked with rewriting content to ensure complete originality while maintaining quality and value."
     local rewrite_prompt="You are an expert author tasked with rewriting content to ensure complete originality while maintaining quality and value. This is rewrite attempt #$attempt.
 
 ORIGINAL CHAPTER:
@@ -284,7 +354,7 @@ REWRITING REQUIREMENTS:
 2. Use original examples, analogies, and explanations
 3. Maintain the same chapter structure and key points
 4. Ensure 100% original content with unique voice
-5. Target 1500-2000 words
+5. Target 2000-2500 words
 6. Use different sentence structures and vocabulary
 7. Create original case studies, examples, and scenarios
 8. Avoid any potentially copyrighted expressions or concepts
@@ -309,7 +379,7 @@ Please rewrite the entire chapter with complete originality:"
     # Make API request using smart multi-provider system
     local response=""
     pulse_animation
-    response=$(smart_api_call "$rewrite_prompt" "chapter_rewrite")
+    response=$(smart_api_call "$rewrite_prompt" "$rewrite_system_prompt" "chapter_rewrite" "$TEMPERATURE" "$MAX_TOKENS" "$MAX_RETRIES" "granite3.3:2b")
     local api_result=$?
     
     if [ $api_result -ne 0 ] || [ -z "$response" ]; then
@@ -346,125 +416,8 @@ Please rewrite the entire chapter with complete originality:"
     local backup_file="${chapter_file}.backup_$(date +%s)"
     cp "$chapter_file" "$backup_file"
     echo "📄 Original backed up to: $(basename "$backup_file")"
-    
-    echo "$rewritten_content" > "$chapter_file"
-    echo "✅ Chapter $chapter_num rewritten for originality"
-    
-    return 0
-}
 
-# Function to perform multiple plagiarism checks (for extra security)
-multi_check_plagiarism() {
-    local chapter_file="$1"
-    local chapter_num=$(basename "$chapter_file" .md | sed 's/chapter_//')
-    
-    echo "🔍 Running comprehensive plagiarism check for Chapter $chapter_num..."
-    echo "DEBUG: Starting multi_check_plagiarism for chapter $chapter_num" >> debug.log
-    
-    # Make sure the file exists
-    if [ ! -f "$chapter_file" ]; then
-        echo "❌ Error: Chapter file not found: $chapter_file"
-        return 1
-    fi
-    
-    # Run initial check without allowing it to exit the script
-    set +e # Make sure we don't exit on error
-    echo "DEBUG: About to run check_plagiarism_and_copyright" >> debug.log
-    check_plagiarism_and_copyright "$chapter_file" 2>/tmp/plagiarism_check_$chapter_num.log
-    local initial_result=$?
-    echo "DEBUG: check_plagiarism_and_copyright returned $initial_result" >> debug.log
-    cat /tmp/plagiarism_check_$chapter_num.log >> debug.log
-    
-    echo "DEBUG: multi_check_plagiarism got result $initial_result from check_plagiarism_and_copyright" >> debug.log
-    
-    # Always return the result rather than exiting
-    if [ $initial_result -eq 2 ]; then
-        echo "⚠️  High risk detected. Performing secondary analysis..."
-        
-        # Run a more detailed check focusing on specific sections
-        local chapter_content=$(cat "$chapter_file")
-        local detailed_prompt="Perform a detailed line-by-line analysis of this text for potential plagiarism. Focus on:
-- Unique phrases that might be copied
-- Technical terminology that might be proprietary
-- Statistical data that might be from specific sources
-- Methodologies that might be copyrighted
-
-Rate each paragraph's originality and flag any concerns:
-
-TEXT TO ANALYZE:
-$chapter_content"
-
-        # Add error handling for JSON payload creation
-        local detailed_payload=""
-        detailed_payload=$(jq -n \
-            --arg prompt "$detailed_prompt" \
-            '{
-                "contents": [{
-                    "parts": [{
-                        "text": $prompt
-                    }]
-                }],
-                "generationConfig": {
-                    "temperature": 0.2,
-                    "topK": 10,
-                    "topP": 0.8,
-                    "maxOutputTokens": 4096
-                }
-            }' 2>/dev/null)
-            
-        if [ $? -ne 0 ] || [ -z "$detailed_payload" ]; then
-            echo "❌ Failed to create JSON payload for detailed analysis"
-        else
-            local max_retries=2
-            local retry_count=0
-            local success=false
-            local detailed_response=""
-            
-            while [ $retry_count -lt $max_retries ] && [ "$success" = false ]; do
-                detailed_response=$(make_api_request "$detailed_payload")
-                local api_result=$?
-                
-                if [ $api_result -eq 0 ] && echo "$detailed_response" | jq -e '.' > /dev/null 2>&1; then
-                    success=true
-                else
-                    retry_count=$((retry_count + 1))
-                    if [ $retry_count -lt $max_retries ]; then
-                        echo "⚠️ Detailed analysis API request failed, retrying ($retry_count/$max_retries)..."
-                        bouncing_bar 3 "Preparing for retry"
-                    else
-                        echo "❌ Maximum retries reached for detailed analysis"
-                    fi
-                fi
-            done
-            
-            if [ "$success" = true ]; then
-                # Check if the response is valid JSON before trying to parse it
-                local detailed_analysis=""
-                if echo "$detailed_response" | jq -e '.candidates[0].content.parts[0].text' > /dev/null 2>&1; then
-                    detailed_analysis=$(echo "$detailed_response" | jq -r '.candidates[0].content.parts[0].text')
-                
-                    # Save detailed analysis
-                    if [ -n "$detailed_analysis" ] && [ "$detailed_analysis" != "null" ]; then
-                        echo "$detailed_analysis" > "${BOOK_DIR}/chapter_${chapter_num}_detailed_analysis.md"
-                        echo "📋 Detailed analysis saved"
-                    else
-                        echo "⚠️ Failed to extract detailed analysis content"
-                    fi
-                else
-                    echo "⚠️ Invalid JSON structure in API response for detailed analysis"
-                fi
-            fi
-        fi
-    fi
-    
-    # We need to explicitly return the result as a number
-    echo "DEBUG: multi_check_plagiarism returning $initial_result" >> debug.log
-    
-    # This is the line that had the syntax error - make sure it's properly closed
-    return $initial_result
-}
-
-# ANSI color codes
+    # ANSI color codes
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
@@ -545,6 +498,36 @@ show_wait_animation() {
     echo -en "\033[?25h"
 }
 
+# ASCII progress bar drawer (reusable)
+draw_progress_bar() {
+    local percent=${1:-0}
+    local width=${2:-20}
+    local filled=$((percent * width / 100))
+    local empty=$((width - filled))
+
+    printf "["
+    if [ $filled -gt 0 ]; then
+        printf "%0.s=" $(seq 1 $filled)
+    fi
+    if [ $empty -gt 0 ]; then
+        printf "%0.s " $(seq 1 $empty)
+    fi
+    printf "] %d%%" "$percent"
+}
+
+# Function to sanitize book topic for use as folder name
+sanitize_book_title() {
+    local topic="$1"
+    
+    # Convert to lowercase, remove apostrophes, then replace non-alphanumeric with dashes
+    echo "$topic" \
+    | tr '[:upper:]' '[:lower:]' \
+    | sed "s/'//g" \
+    | sed -E 's/[^a-z0-9 ]//g' \
+    | tr -s ' ' '-' \
+    | sed -E 's/^-+//; s/-+$//' 
+}
+
 # Function to show API usage dashboard
 show_api_usage() {
     initialize_api_tracking
@@ -569,18 +552,7 @@ show_api_usage() {
     local minute_percent=$((minute_count * 100 / MAX_CALLS_PER_MINUTE))
     local day_percent=$((day_count * 100 / MAX_CALLS_PER_DAY))
     
-    # Draw ASCII progress bars
-    draw_progress_bar() {
-        local percent=$1
-        local width=20
-        local filled=$((percent * width / 100))
-        local empty=$((width - filled))
-        
-        printf "["
-        printf "%${filled}s" | tr ' ' '='
-        printf "%${empty}s" | tr ' ' ' '
-        printf "] %d%%" "$percent"
-    }
+    # Draw ASCII progress bars (uses top-level draw_progress_bar)
     
     echo -e "\n${CYAN}════════════════ API USAGE DASHBOARD ════════════════${RESET}"
     
@@ -674,6 +646,52 @@ loading_dots() {
         sleep 0.1
         count=$((count + 1))
     done
+    printf "\r\033[K"
+}
+    
+    # Removed section-splitting and section-specific quality checks per user request.
+    # Instead we provide a helper that appends continuation text until min words are reached.
+
+    append_until_min_words() {
+        local chapter_file="$1"
+        local min_words="$2"
+        local attempt=1
+        local max_attempts=5
+        local current_words=$(wc -w < "$chapter_file" | tr -d ' ')
+
+        while [ "$current_words" -lt "$min_words" ] && [ $attempt -le $max_attempts ]; do
+            echo "🔁 Auto-append attempt $attempt for $chapter_file (current: $current_words, target: $min_words)"
+            local continue_prompt="The chapter below currently has ${current_words} words and must be expanded to at least ${min_words} words. Continue the chapter in the same voice and style, expanding ideas and adding examples without repeating text verbatim. Provide ONLY the continuation text to append.\n\n$(cat "$chapter_file")"
+            local cont_result
+            cont_result=$(smart_api_call "$continue_prompt" "$CHAPTER_SYSTEM_PROMPT" "continuation" 0.6 2048 1 "phi4-mini:3.8b")
+            if [ $? -ne 0 ] || [ -z "$cont_result" ]; then
+                echo "⚠️ Auto-append attempt $attempt failed or returned empty"
+                attempt=$((attempt + 1))
+                continue
+            fi
+
+            # Clean and append
+            cont_result=$(echo "$cont_result" | sed 's/^---$//g' | sed '/^Note:/d' | sed '/^This content could be appended/d' | sed '/^I will now continue/d')
+            echo -e "\n\n$cont_result" >> "$chapter_file"
+
+            current_words=$(wc -w < "$chapter_file" | tr -d ' ')
+            echo "ℹ️ New word count for $(basename "$chapter_file"): $current_words words"
+            attempt=$((attempt + 1))
+        done
+
+        if [ "$current_words" -lt "$min_words" ]; then
+            echo "⚠️ After auto-append attempts, $(basename "$chapter_file") remains below minimum ($current_words/$min_words)."
+        else
+            echo "✅ $(basename "$chapter_file") reached target: $current_words words"
+        fi
+    }
+
+    # Call the helper to ensure chapter reaches minimum length
+    append_until_min_words "$CHAPTER_FILE" "$MIN_WORDS"
+
+    # Final word count
+    FINAL_WORD_COUNT=$(wc -w < "$CHAPTER_FILE" | tr -d ' ')
+    echo "📊 Chapter $CHAPTER_NUM final word count: $FINAL_WORD_COUNT words"
     printf "\r\033[K"
 }
 
@@ -791,34 +809,34 @@ countdown_timer() {
 }
 
 # Progress bar animation
-progress_bar() {
-    local duration=${1:-5}
-    local message="${2:-Loading}"
-    local width=30
-    local count=0
-    local total=$((duration * 10))
+# progress_bar() {
+#     local duration=${1:-5}
+#     local message="${2:-Loading}"
+#     local width=30
+#     local count=0
+#     local total=$((duration * 10))
     
-    while [ $count -lt $total ]; do
-        local progress=$((count * width / total))
-        local percent=$((count * 100 / total))
+#     while [ $count -lt $total ]; do
+#         local progress=$((count * width / total))
+#         local percent=$((count * 100 / total))
         
-        # Create the bar
-        local bar="["
-        for ((i=0; i<width; i++)); do
-            if [ $i -lt $progress ]; then
-                bar+="${GREEN}=${RESET}"
-            else
-                bar+=" "
-            fi
-        done
-        bar+="]"
+#         # Create the bar
+#         local bar="["
+#         for ((i=0; i<width; i++)); do
+#             if [ $i -lt $progress ]; then
+#                 bar+="${GREEN}=${RESET}"
+#             else
+#                 bar+=" "
+#             fi
+#         done
+#         bar+="]"
         
-        printf "\r\033[K🔄 $message $bar ${BLUE}%d%%${RESET}" "$percent"
-        sleep 0.1
-        count=$((count + 1))
-    done
-    printf "\r\033[K"
-}
+#         printf "\r\033[K🔄 $message $bar ${BLUE}%d%%${RESET}" "$percent"
+#         sleep 0.1
+#         count=$((count + 1))
+#     done
+#     printf "\r\033[K"
+# }
 
 # Function for typewriter effect
 typewriter() {
@@ -1113,7 +1131,6 @@ echo "👥 Audience: $AUDIENCE"
 echo ""
 
 # Initialize multi-provider system
-echo "🔧 Initializing multi-provider AI system..."
 if setup_multi_provider_system; then
     echo "✅ Multi-provider system initialized successfully"
     echo ""
@@ -1122,12 +1139,15 @@ else
     exit 1
 fi
 
-# API configuration
-API_URL="https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent"
+# API configuration (legacy - now using Ollama only)
+# API_URL="https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent"
 
-# Initialize API tracking and show dashboard
-initialize_api_tracking
-show_api_usage
+# Note: API tracking now handled by smart_api_call in multi_provider_ai_simple.sh
+# Initialize API tracking and show dashboard (commenting out for Ollama-only mode)
+# initialize_api_tracking
+# show_api_usage
+
+echo "🔧 Configuration: Using Ollama-only mode via smart_api_call"
 
 # Utility function to escape JSON strings properly
 escape_json() {
@@ -1195,14 +1215,14 @@ if [ -z "$CHAPTERS_ONLY" ]; then
     SYSTEM_PROMPT=$(cat << 'EOF'
 You are an expert book author and publishing professional tasked with creating high-quality, commercially viable books for publication on KDP and other platforms. Your goal is to produce engaging, well-structured, and professionally written content that readers will find valuable and enjoyable.
 
-Create detailed book outlines that will guide the generation of 20,000-25,000 word books with 12-15 chapters of 1,500-2,000 words each.
-
-When creating outlines, always format chapter titles clearly as:
-Chapter 1: [Title]
-Chapter 2: [Title]
-etc.
-
-Include comprehensive chapter summaries that will guide detailed content generation. DO NOT include any markdown characters or formatting other than numbered lists.
+When creating book outlines, you must always follow these strict formatting rules:
+- Chapters must be listed in the format: "Chapter X: Title"
+- Use consecutive numbers (1, 2, 3, …), no Roman numerals or bullets
+- Each chapter must include a 2-3 sentence summary immediately after the title
+- Do not include any Markdown (#, *, -, etc.)
+- Do not use quotation marks around titles
+- Do not include extra formatting or decorations
+- The number of chapters should be a minimum of 14 and a maximum of 20.
 EOF
 )
 
@@ -1211,74 +1231,128 @@ echo "$SYSTEM_PROMPT" | head -n 10 >> debug.log  # Log first 10 lines for contex
 
     USER_PROMPT="Create a detailed outline for a ${GENRE} book about '${TOPIC}' targeting ${AUDIENCE}.
 
-REQUIRED FORMAT - Use this exact format for chapters:
+REQUIRED FORMAT:
 Chapter 1: [Chapter Title]
+[2-3 sentence summary]
 Chapter 2: [Chapter Title]
-[etc.]
+[2-3 sentence summary]
+(continue for 14-20 chapters)
 
-Include:
-- Compelling book title and subtitle
-- 12-15 chapters with descriptive titles
-- 2-3 sentence summary for each chapter explaining what will be covered
-- Character profiles (fiction) or key concept definitions (non-fiction)
-- 3-5 core themes to weave throughout the book
-- Target reading level and tone guidance
-- Suggested word count distribution
+Also include, at the end:
+1. A compelling book title and subtitle
+2. 3-5 core themes to weave throughout the book
+3. Character profiles (for fiction) or key concept definitions (for non-fiction)
+4. Target reading level and tone guidance
+5. Suggested word count distribution
 
-Make sure chapter titles are specific and promise clear value to readers. DO NOT include any markdown characters or formatting other than numbered lists."
+STRICT REQUIREMENTS:
+- Chapters must always use the exact format: 'Chapter N: Title'
+- No Markdown, bullets, asterisks, or extra symbols
+- No indentation or numbering other than 'Chapter N'
+- All text must be plain text, easy to parse"
 
-    ESCAPED_SYSTEM=$(escape_json "$SYSTEM_PROMPT")
-    ESCAPED_USER=$(escape_json "$USER_PROMPT")
-
-    # Create JSON payload using jq for proper escaping
-    JSON_PAYLOAD=$(jq -n \
-        --arg system "$SYSTEM_PROMPT" \
-        --arg user "$USER_PROMPT" \
-        --arg maxtokens "$MAX_TOKENS" \
-        '{
-            "contents": [{
-                "parts": [{
-                    "text": ("SYSTEM: " + $system + "\n\nUSER: " + $user)
-                }]
-            }],
-            "generationConfig": {
-                "temperature": 0.7,
-                "topK": 40,
-                "topP": 0.95,
-                "maxOutputTokens": $maxtokens
-            }
-        }')
-    echo "Debug: JSON_PAYLOAD for outline generation:" > debug.log
+    echo "Debug: USER_PROMPT for outline generation:" > debug.log
     echo "$USER_PROMPT" >> debug.log
-
-    typewriter "Preparing to generate your book outline..." 0.03 "🧠 "
-    progress_bar 3 "Generating outline structure"
-    RESPONSE=$(make_api_request "$JSON_PAYLOAD")
+    typewriter "Preparing to generate your book outline..." 0.05 "🧠 "
+    
+    
+    # Use smart_api_call directly instead of complex JSON payload construction
+    loading_dots 8 "🔄 Making API request for book outline generation" &
+    OUTLINE_RESPONSE=$(smart_api_call "$USER_PROMPT" "$SYSTEM_PROMPT" "analytical" "$TEMPERATURE" "$MAX_TOKENS" "$MAX_RETRIES" "gemma3:1b")
+    smart_api_result=$?
 
     # Error handling
-    if echo "$RESPONSE" | jq -e '.error' > /dev/null 2>&1; then
-        echo "${RED}❌ API Error:${RESET}"
-        echo "$RESPONSE" | jq '.error'
-        return 1
-    fi
-
-    if [ $? -ne 0 ]; then
+    if [ $smart_api_result -ne 0 ]; then
         echo "${RED}❌ API request failed. Exiting.${RESET}"
         exit 1
     fi
 
-    # Create output directory and save outline
-    OUTPUT_DIR="./book_outputs"
-    mkdir -p "$OUTPUT_DIR"
+    # Create book-specific output directory
+    BOOK_TITLE_SANITIZED=$(sanitize_book_title "$TOPIC")
     TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-    OUTLINE_FILE="${OUTPUT_DIR}/book_outline_${TIMESTAMP}.md"
+    OUTPUT_DIR="./book_outputs/${BOOK_TITLE_SANITIZED}-${TIMESTAMP}"
+    mkdir -p "$OUTPUT_DIR"
+    
+    OUTLINE_FILE="${OUTPUT_DIR}/book_outline.md"
 
-    echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text' > "$OUTLINE_FILE"
-    echo "📃 Outline generated and saved to: $OUTLINE_FILE"
+    echo "$OUTLINE_RESPONSE" > "$OUTLINE_FILE"
+    # Sanitize outline to extract only chapter headers and their summaries,
+    # then renumber chapters starting at 1 to avoid stray high-numbered entries
+    sanitize_outline_file() {
+        local infile="$1"
+        local tmpf
+        tmpf=$(mktemp)
 
-    # Review and Proofreading Step
-    rainbow_text 2 "Preparing review step"
-    REVIEW_PROMPT="Review and proofread the following book outline for grammar, clarity, and structure. Suggest any necessary corrections or improvements."
+        awk '
+        BEGIN {
+            IGNORECASE=1;
+            chap_re = "^Chapter[[:space:]]*[0-9]+[[:space:]]*:";
+            in_chapter = 0;
+            summary_lines = 0;
+        }
+        {
+            if ($0 ~ chap_re) {
+                # Start a new chapter block
+                in_chapter = 1;
+                summary_lines = 0;
+                print $0;
+                next;
+            }
+            if (in_chapter) {
+                # Stop chapter block if next chapter header starts (handled above) or if we hit a metadata header
+                if ($0 ~ /^[[:space:]]*$/) {
+                    # blank line counts as part of separation; allow one blank line
+                    print "";
+                    summary_lines++;
+                    if (summary_lines >= 3) { in_chapter = 0 }
+                    next;
+                }
+                # Stop if we encounter obvious metadata headings
+                if ($0 ~ /^(\*\*Subtitle|\*\*Themes|Themes:|Character Profiles|Key Concept|Key Concept Definitions|Target Reading Level|Suggested Word Count|Suggested Word Count Distribution|Suggested Word Count:|\-\-|\*\*|## )/i) {
+                    in_chapter = 0;
+                    next;
+                }
+                # Otherwise treat as summary line and print, but limit to 4 lines
+                if (summary_lines < 4) {
+                    print $0;
+                    summary_lines++;
+                } else {
+                    in_chapter = 0;
+                }
+            }
+        }
+        ' "$infile" > "$tmpf"
+
+        # Renumber chapters sequentially starting at 1
+        if [ -s "$tmpf" ]; then
+            awk '
+            BEGIN { count = 0 }
+            /^Chapter[[:space:]]*[0-9]+[[:space:]]*:/ {
+                count++;
+                # extract everything after the colon
+                split($0, parts, ":");
+                title = parts[2];
+                # Trim leading spaces
+                sub(/^[[:space:]]+/, "", title);
+                print "Chapter " count ": " title;
+                next;
+            }
+            { print }
+            ' "$tmpf" > "${tmpf}.renumbered"
+
+            mv "${tmpf}.renumbered" "$infile"
+            rm -f "$tmpf"
+            echo "DEBUG: Sanitized outline (chapters only) saved to $infile" >> debug.log
+        else
+            rm -f "$tmpf"
+            echo "DEBUG: Sanitization produced empty result for $infile; leaving original" >> debug.log
+        fi
+    }
+
+    # Run sanitization on the generated outline to remove appended metadata
+    sanitize_outline_file "$OUTLINE_FILE"
+    # Display path more cleanly to avoid terminal wrap issues
+    echo -e "📃 Outline generated and saved to:\n   $OUTLINE_FILE"
 
     # Ensure OUTLINE_CONTENT is populated with the correct outline file content
     if [ -f "$OUTLINE_FILE" ]; then
@@ -1288,74 +1362,106 @@ Make sure chapter titles are specific and promise clear value to readers. DO NOT
         exit 1
     fi
 
+    # Review and Proofreading Step
+    rainbow_text 2 "Preparing review step"
+    REVIEW_PROMPT="Review and proofread the following book outline for grammar, clarity, and structure. Suggest any necessary corrections or improvements. Ensure to keep the chapter titles and numbers intact. These chapters and numbers are required for the next steps in the book generation process. Also keep the book title at the top of the response.
+
+OUTLINE:
+$OUTLINE_CONTENT"
+
     # Debugging: Confirm OUTLINE_CONTENT before review step
     echo "Debug: OUTLINE_CONTENT before review step:" > debug.log
     echo "$OUTLINE_CONTENT" | head -n 10 >> debug.log  # Log first 10 lines for context
 
-    REVIEW_JSON_PAYLOAD=$(jq -n \
-        --arg system "$SYSTEM_PROMPT" \
-        --arg review "$REVIEW_PROMPT" \
-        --arg outline "$OUTLINE_CONTENT" \
-        --arg maxtokens "$MAX_TOKENS" \
-        '{
-            "contents": [{
-                "parts": [{
-                    "text": ("SYSTEM: " + $system + "\n\nUSER: " + $review + "\n\nOUTLINE:\n" + $outline)
-                }]
-            }],
-            "generationConfig": {
-                "temperature": 0.7,
-                "topK": 40,
-                "topP": 0.95,
-                "maxOutputTokens": $maxtokens
-            }
-        }')
-
-    loading_dots 3 "🔄 Making API request for review and proofreading"
-    REVIEW_RESPONSE=$(make_api_request "$REVIEW_JSON_PAYLOAD")
+    loading_dots 10 "🔄 Making API request for review and proofreading" &
+    REVIEW_RESPONSE=$(smart_api_call "$REVIEW_PROMPT" "$SYSTEM_PROMPT" "analytical" 0.5 "$MAX_TOKENS" "$MAX_RETRIES" "qwen2:7b-instruct-q4_K_M")
 
     if [ $? -ne 0 ]; then
         echo "❌ API request for review failed. Exiting."
         exit 1
     fi
 
-    REVIEWED_OUTLINE_FILE="${OUTPUT_DIR}/book_outline_reviewed_${TIMESTAMP}.md"
-    echo "$REVIEW_RESPONSE" | jq -r '.candidates[0].content.parts[0].text' > "$REVIEWED_OUTLINE_FILE"
-    echo "✅ Reviewed outline saved to: $REVIEWED_OUTLINE_FILE"
+    REVIEWED_OUTLINE_FILE="${OUTPUT_DIR}/book_outline_reviewed.md"
+    echo "$REVIEW_RESPONSE" > "$REVIEWED_OUTLINE_FILE"
+    # Sanitize reviewed outline as well
+    sanitize_outline_file "$REVIEWED_OUTLINE_FILE"
+    # Display path more cleanly to avoid terminal wrap issues
+    echo -e "✅ Reviewed outline saved to:\n   $REVIEWED_OUTLINE_FILE"
 
     # Second/Final Draft Step
+    echo "DEBUG: Starting final draft step" >> debug.log
+    echo "DEBUG: REVIEWED_OUTLINE_FILE = $REVIEWED_OUTLINE_FILE" >> debug.log
+    echo "DEBUG: File exists check: $([ -f "$REVIEWED_OUTLINE_FILE" ] && echo "YES" || echo "NO")" >> debug.log
+    
     loading_dots 2 "Preparing final draft"
-    FINAL_DRAFT_PROMPT="Improve the following book outline in any way possible. Focus on enhancing its quality, structure, and content. Ensure it is engaging and well-organized."
+    
+    # Check if reviewed outline file exists and has content
+    if [ ! -f "$REVIEWED_OUTLINE_FILE" ]; then
+        echo "❌ Error: Reviewed outline file not found at $REVIEWED_OUTLINE_FILE"
+        echo "DEBUG: Reviewed outline file not found, exiting" >> debug.log
+        exit 1
+    fi
+    
+    if [ ! -s "$REVIEWED_OUTLINE_FILE" ]; then
+        echo "❌ Error: Reviewed outline file is empty"
+        echo "DEBUG: Reviewed outline file is empty, exiting" >> debug.log
+        exit 1
+    fi
+    
+    echo "DEBUG: Reviewed outline file size: $(wc -c < "$REVIEWED_OUTLINE_FILE") bytes" >> debug.log
+    echo "DEBUG: First few lines of reviewed outline:" >> debug.log
+    head -n 5 "$REVIEWED_OUTLINE_FILE" >> debug.log
 
-    FINAL_DRAFT_JSON_PAYLOAD=$(jq -n \
-        --arg system "$SYSTEM_PROMPT" \
-        --arg prompt "$FINAL_DRAFT_PROMPT" \
-        --arg outline "$(cat "$REVIEWED_OUTLINE_FILE")" \
-        --arg maxtokens "$MAX_TOKENS" \
-        '{
-            "contents": [{
-                "parts": [{
-                    "text": ("SYSTEM: " + $system + "\n\nUSER: " + $prompt + "\n\nOUTLINE:\n" + $outline)
-                }]
-            }],
-            "generationConfig": {
-                "temperature": 0.7,
-                "topK": 40,
-                "topP": 0.95,
-                "maxOutputTokens": $maxtokens
-            }
-        }')
-    loading_dots 3 "🔄 Making API request for second/final draft"
-    FINAL_DRAFT_RESPONSE=$(make_api_request "$FINAL_DRAFT_JSON_PAYLOAD")
+    FINAL_DRAFT_PROMPT="Improve the following book outline in any way possible. Focus on enhancing its quality, structure, and content. Ensure it is engaging and well-organized. Ensure to keep the chapter titles and numbers intact. These chapters and numbers are required for the next steps in the book generation process. Also keep the book title at the top of the response.
 
-    if [ $? -ne 0 ]; then
-        echo "❌ API request for final draft failed. Exiting."
+OUTLINE:
+$(cat "$REVIEWED_OUTLINE_FILE")"
+
+    echo "DEBUG: Final draft prompt length: ${#FINAL_DRAFT_PROMPT} characters" >> debug.log
+    echo "DEBUG: About to call smart_api_call for final draft" >> debug.log
+
+    loading_dots 10 "🔄 Making API request for second/final draft" &
+    FINAL_DRAFT_RESPONSE=$(smart_api_call "$FINAL_DRAFT_PROMPT" "$SYSTEM_PROMPT" "creative" 0.4 "$MAX_TOKENS" "$MAX_RETRIES" "gemma3:1b")
+    final_draft_exit_code=$?
+    
+    echo "DEBUG: smart_api_call returned with exit code: $final_draft_exit_code" >> debug.log
+    echo "DEBUG: Final draft response length: ${#FINAL_DRAFT_RESPONSE} characters" >> debug.log
+    
+    if [ $final_draft_exit_code -ne 0 ]; then
+        echo "❌ API request for final draft failed. Exit code: $final_draft_exit_code"
+        echo "DEBUG: Final draft API call failed with exit code $final_draft_exit_code" >> debug.log
         exit 1
     fi
 
-    FINAL_DRAFT_FILE="${OUTPUT_DIR}/book_outline_final_${TIMESTAMP}.md"
-    echo "$FINAL_DRAFT_RESPONSE" | jq -r '.candidates[0].content.parts[0].text' > "$FINAL_DRAFT_FILE"
-    echo "✅ Final draft saved to: $FINAL_DRAFT_FILE"
+    echo "DEBUG: Final draft response received successfully" >> debug.log
+    
+    # Validate that we have a non-empty response
+    if [ -z "$FINAL_DRAFT_RESPONSE" ]; then
+        echo "❌ Error: Final draft response is empty"
+        echo "DEBUG: Final draft response is empty" >> debug.log
+        exit 1
+    fi
+
+    FINAL_DRAFT_FILE="${OUTPUT_DIR}/book_outline_final.md"
+    echo "DEBUG: About to save final draft to: $FINAL_DRAFT_FILE" >> debug.log
+    
+    echo "$FINAL_DRAFT_RESPONSE" > "$FINAL_DRAFT_FILE"
+    # Sanitize final draft outline
+    sanitize_outline_file "$FINAL_DRAFT_FILE"
+    save_result=$?
+    
+    echo "DEBUG: File save operation returned: $save_result" >> debug.log
+    echo "DEBUG: Final draft file size after save: $(wc -c < "$FINAL_DRAFT_FILE" 2>/dev/null || echo "ERROR") bytes" >> debug.log
+    
+    if [ $save_result -eq 0 ] && [ -f "$FINAL_DRAFT_FILE" ] && [ -s "$FINAL_DRAFT_FILE" ]; then
+        # Display path more cleanly to avoid terminal wrap issues
+        echo -e "✅ Final draft saved to:\n   $FINAL_DRAFT_FILE"
+        echo "DEBUG: Final draft saved successfully" >> debug.log
+    else
+        echo "❌ Error: Failed to save final draft to file"
+        echo "DEBUG: Failed to save final draft - save_result=$save_result, file_exists=$([ -f "$FINAL_DRAFT_FILE" ] && echo "YES" || echo "NO"), file_size=$(wc -c < "$FINAL_DRAFT_FILE" 2>/dev/null || echo "ERROR")" >> debug.log
+        exit 1
+    fi
     
     # Check if outline only mode is enabled
     if [ "$OUTLINE_ONLY" = true ]; then
@@ -1392,141 +1498,83 @@ if [ -z "$CHAPTERS_INFO" ]; then
     exit 1
 fi
 
-# Debugging: Add trace for API request failures
+# Legacy API function replaced with smart_api_call wrapper
+# This maintains backward compatibility while using the improved multi-provider system
 make_api_request() {
     local payload="$1"
     local function_caller=${FUNCNAME[1]}
-    local response=""
-    local max_retries=3
-    local retry_count=0
-    local base_wait_time=2
     
-    echo "DEBUG: make_api_request called from $function_caller" >> debug.log
+    echo "DEBUG: make_api_request (legacy) called from $function_caller, converting to smart_api_call" >> debug.log
     
-    # Validate that payload is valid JSON before sending
+    # Validate that payload is valid JSON before processing
     if ! echo "$payload" | jq -e '.' > /dev/null 2>&1; then
         echo "❌ Invalid JSON payload"
         echo "DEBUG: make_api_request invalid payload, returning 1" >> debug.log
         return 1
     fi
     
-    # Check rate limits and get necessary delay time
-    local rate_delay=$(check_rate_limits)
-    local rate_status=$?
+    # Extract prompt from Gemini-format JSON payload
+    local user_prompt=""
+    local system_prompt="You are a helpful AI assistant specializing in book writing and content creation."
     
-    # If we hit the daily limit, exit
-    if [ $rate_status -ne 0 ]; then
-        echo "DEBUG: make_api_request daily rate limit reached, returning 1" >> debug.log
+    # Try to extract the prompt from the JSON structure
+    if echo "$payload" | jq -e '.contents[0].parts[0].text' > /dev/null 2>&1; then
+        local full_text=$(echo "$payload" | jq -r '.contents[0].parts[0].text')
+        
+        # Check if it's in SYSTEM/USER format
+        if echo "$full_text" | grep -q "^SYSTEM:"; then
+            system_prompt=$(echo "$full_text" | sed -n 's/^SYSTEM: \(.*\)$/\1/p' | head -1)
+            user_prompt=$(echo "$full_text" | sed 's/^SYSTEM: .*$//' | sed 's/^USER: //' | sed 's/^[[:space:]]*//')
+        else
+            user_prompt="$full_text"
+        fi
+    else
+        echo "❌ Could not extract prompt from payload"
+        echo "DEBUG: make_api_request could not parse payload, returning 1" >> debug.log
         return 1
     fi
     
-    # If we need to wait due to rate limiting
-    if [ "$rate_delay" -gt 0 ]; then
-        show_wait_animation "$rate_delay" "Waiting for rate limit"
+    # Extract temperature if available
+    local temperature="0.8"
+    if echo "$payload" | jq -e '.generationConfig.temperature' > /dev/null 2>&1; then
+        temperature=$(echo "$payload" | jq -r '.generationConfig.temperature')
     fi
     
-    while [ $retry_count -lt $max_retries ]; do
-        # Show animation for API call
-        echo -ne "\r${CYAN}⚡${RESET} Making API request... "
-        
-        # Make the API request
-        response=$(curl -s -X POST \
-            -H "Content-Type: application/json" \
-            -H "x-goog-api-key: $API_KEY" \
-            -d "$payload" \
-            -w "\n%{http_code}" \
-            "$API_URL")
-            
-        # Extract HTTP status code from response
-        local http_code=$(echo "$response" | tail -n1)
-        local json_response=$(echo "$response" | sed '$d')
-        
-        # Clear the animation line
-        echo -e "\r\033[K"
-        
-        echo "Debug: Raw API response (HTTP $http_code):" >> debug.log
-        echo "$json_response" >> debug.log
-        
-        # Calculate current usage statistics for display
-        local minute_usage=$(cat "$API_CALLS_FILE" | cut -d' ' -f2)
-        local day_usage=$(cat "$API_CALLS_TODAY_FILE" | cut -d' ' -f2)
-        echo -e "${BLUE}ℹ️${RESET} API Usage: ${minute_usage}/${MAX_CALLS_PER_MINUTE} per minute, ${day_usage}/${MAX_CALLS_PER_DAY} per day"
-        
-        # Check for rate limiting (HTTP 429 - Too Many Requests)
-        if [ "$http_code" = "429" ]; then
-            retry_count=$((retry_count + 1))
-            if [ $retry_count -lt $max_retries ]; then
-                local wait_time=$((base_wait_time * 2 ** retry_count))  # Exponential backoff
-                echo "⚠️ Rate limited by server. Retrying after cooldown (Attempt $retry_count/$max_retries)"
-                show_wait_animation "$wait_time" "Rate limit cooldown"
-                continue
-            else
-                echo "❌ Rate limit exceeded after $max_retries attempts"
-                echo "DEBUG: make_api_request rate limit error, returning 1" >> debug.log
-                return 1
-            fi
-        fi
-        
-        # Check for other HTTP errors
-        if [ "$http_code" != "200" ]; then
-            retry_count=$((retry_count + 1))
-            if [ $retry_count -lt $max_retries ]; then
-                local wait_time=$((base_wait_time * 2 ** retry_count))  # Exponential backoff
-                echo "⚠️ HTTP error $http_code. Retrying after delay (Attempt $retry_count/$max_retries)"
-                show_wait_animation "$wait_time" "Error recovery delay"
-                continue
-            else
-                echo "❌ HTTP error $http_code after $max_retries attempts"
-                echo "DEBUG: make_api_request HTTP error $http_code, returning 1" >> debug.log
-                return 1
-            fi
-        fi
-        
-        # Check if the response is valid JSON
-        if ! echo "$json_response" | jq -e '.' > /dev/null 2>&1; then
-            retry_count=$((retry_count + 1))
-            if [ $retry_count -lt $max_retries ]; then
-                local wait_time=$((base_wait_time * retry_count))
-                echo "⚠️ Invalid JSON response. Retrying after delay (Attempt $retry_count/$max_retries)"
-                show_wait_animation "$wait_time" "Error recovery delay"
-                continue
-            else
-                echo "❌ Invalid JSON response after $max_retries attempts"
-                echo "DEBUG: make_api_request invalid JSON response, returning 1" >> debug.log
-                return 1
-            fi
-        fi
-        
-        # Check for API error in response
-        if echo "$json_response" | jq -e '.error' > /dev/null 2>&1; then
-            local error_message=$(echo "$json_response" | jq -r '.error.message')
-            local error_code=$(echo "$json_response" | jq -r '.error.code')
-            
-            retry_count=$((retry_count + 1))
-            if [ $retry_count -lt $max_retries ]; then
-                local wait_time=$((base_wait_time * retry_count))
-                echo "⚠️ API error ($error_code): $error_message (Attempt $retry_count/$max_retries)"
-                show_wait_animation "$wait_time" "API error recovery"
-                continue
-            else
-                echo "❌ API error after $max_retries attempts:"
-                echo "$json_response" | jq '.error'
-                echo "DEBUG: make_api_request API error detected, returning 1" >> debug.log
-                return 1
-            fi
-        fi
-        
-        # If we got here, the request was successful
-        echo -e "${GREEN}✓${RESET} API request successful!"
-        echo "DEBUG: make_api_request returning successfully" >> debug.log
-        echo "$json_response"
-        return 0
-    done
+    # Extract max tokens if available
+    local max_tokens="50000"
+    if echo "$payload" | jq -e '.generationConfig.maxOutputTokens' > /dev/null 2>&1; then
+        max_tokens=$(echo "$payload" | jq -r '.generationConfig.maxOutputTokens')
+    fi
     
-    # This should not be reached, but just in case
-    echo "❌ API request failed after $max_retries attempts"
-    echo "DEBUG: make_api_request reached unexpected end, returning 1" >> debug.log
-    return 1
+    echo "DEBUG: Converted to smart_api_call with temp=$temperature, max_tokens=$max_tokens" >> debug.log
+    
+    # Call smart_api_call and format response to match expected JSON structure
+    loading_dots 6 "🔄 Making API request via smart_api_call" &
+    local response=$(smart_api_call "$user_prompt" "$system_prompt" "creative" "$TEMPERATURE" "$MAX_TOKENS" "$MAX_RETRIES" "gemma3:1b")
+    local smart_api_result=$?
+    
+    if [ $smart_api_result -eq 0 ]; then
+        # Format response to match Gemini JSON structure expected by existing code
+        local formatted_response=$(jq -n \
+            --arg content "$response" \
+            '{
+                "candidates": [{
+                    "content": {
+                        "parts": [{
+                            "text": $content
+                        }]
+                    }
+                }]
+            }')
+        
+        echo "DEBUG: make_api_request returning successfully via smart_api_call" >> debug.log
+        echo "$formatted_response"
+        return 0
+    else
+        echo "❌ Smart API call failed"
+        echo "DEBUG: make_api_request smart_api_call failed, returning 1" >> debug.log
+        return 1
+    fi
 }
 
 # Extract chapters from outline
@@ -1564,14 +1612,13 @@ echo ""
 echo "✍️  Step 3: Generating chapters..."
 echo "⏱️  Delay between chapters: ${DELAY_BETWEEN_CHAPTERS}s"
 echo ""
-show_wait_animation 2
 
 BOOK_DIR=$(dirname "$OUTLINE_FILE")
 OUTLINE_CONTENT=$(cat "$OUTLINE_FILE")
 TOTAL_WORDS=0
 
 # System prompt for chapter generation
-CHAPTER_SYSTEM_PROMPT="You are an expert book author creating comprehensive, high-quality chapters for publication. Focus on creating detailed, engaging content that provides genuine value to readers."
+CHAPTER_SYSTEM_PROMPT="You are a professional book author specializing in creating immersive, narrative-driven chapters for publication. You excel at long-form storytelling with flowing paragraphs rather than lists or bullet points. Focus on creating rich, descriptive content that pulls readers into the subject through vivid language and emotional connection. Your writing style favors continuous narrative text over fragmented sections, creates memorable mental images, and maintains consistent pacing throughout each chapter. You produce only final, publication-ready text without meta-commentary, separators, or annotations. Do not include the book outline, notes, or any other extraneous information in the response."
 
 # Store chapters in an array to avoid pipe issues
 echo "DEBUG: Preparing to process chapters" >> debug.log
@@ -1614,7 +1661,9 @@ for CHAPTER_LINE in "${CHAPTER_LINES[@]}"; do
     CHAPTER_TITLE=$(echo "$CHAPTER_TITLE" | sed 's/^[[:space:]]*"//;s/"[[:space:]]*$//;s/^[[:space:]]*//;s/[[:space:]]*$//;s/\*//g;s/[[:space:]]*[*-]\?[[:space:]]*$//;s/[[:space:]]*$//')
 
     echo "📝 Generating Chapter $CHAPTER_NUM: $CHAPTER_TITLE"
-    
+
+    # Ideally, if generate chapters from outline is selected, it should start from the last completed chapter
+
     # Collect existing chapters for context
     EXISTING_CHAPTERS=""
     for i in $(seq 1 $((CHAPTER_NUM - 1))); do
@@ -1670,12 +1719,34 @@ for CHAPTER_LINE in "${CHAPTER_LINES[@]}"; do
     # Clean outline content to remove markdown asterisks
 OUTLINE_CONTENT=$(echo "$OUTLINE_CONTENT" | sed 's/\*\*//g')
 
+# Create new loop, to extend generate more to the chapter file and join both to meet the minimum word count
+
 CHAPTER_USER_PROMPT="Write Chapter ${CHAPTER_NUM}: '${CHAPTER_TITLE}' based on the outline and existing chapters.
 
 CRITICAL LENGTH REQUIREMENT:
 - Write EXACTLY ${MIN_WORDS}-${MAX_WORDS} words (this is mandatory)
 - Do NOT write less than ${MIN_WORDS} words under any circumstances
 - Expand ideas fully to reach the required length naturally
+
+CRITICAL OUTPUT FORMAT REQUIREMENTS:
+- ONLY produce FINAL chapter content - NO comments, notes, placeholders, or separators (---)
+- NEVER include meta text like 'Here is the chapter' or 'This content could be appended'
+- NEVER acknowledge these instructions in your response
+- DO NOT use the word 'Conclusion' as a subheading - use creative alternatives instead
+- NEVER include text that suggests the content is a draft or sample
+- NEVER explain what you're doing or what you've written
+- NEVER include the book outline or any other chapters in your response
+- NEVER include any meta-text or commentary in your response
+- NEVER include any instructions or explanations in your response
+
+PARAGRAPH AND FORMATTING REQUIREMENTS:
+- At least 90% of content MUST be narrative paragraphs (this is mandatory)
+- Use no more than 1-2 bulleted or numbered lists in the entire chapter
+- Limit use of bold formatting to no more than 5 instances
+- Use subheadings sparingly (maximum 4-5 in total)
+- Write long form paragraphs and avoid fragmented sentences
+- If ending with a summary, use creative titles like 'Looking Ahead' or 'The Path Forward'
+- For the final paragraph, consider a seamless transition without a subheading
 
 PLAGIARISM AND ORIGINALITY:
 - Ensure all content is completely original, do not use any copyrighted material whatsoever
@@ -1693,19 +1764,18 @@ ${TONE_INSTRUCTIONS}
 
 STRUCTURE REQUIREMENTS:
 - Start with a compelling opening hook
-- Use 5-8 clear subheadings to organize content
-- Include 2-3 detailed examples or case studies per major section
-- Provide step-by-step guidance where applicable
-- End with actionable takeaways and transition to next chapter
+- Focus on storytelling and narrative flow throughout
+- Present concepts as a cohesive journey rather than disconnected sections
+- Use descriptive language that creates vivid mental images
+- End with reflective thoughts that lead naturally to the next chapter
 
 CONTENT EXPANSION TECHNIQUES:
-- Elaborate on every concept with detailed explanations
-- Include 'why' and 'how' for every major point
-- Add real-world applications and scenarios
-- Address common questions or objections
-- Provide multiple examples for complex concepts
-- Break down processes into detailed steps
-- Use analogies and metaphors to clarify concepts
+- Elaborate on every concept with detailed explanations and rich descriptions
+- Develop flowing narrative with seamless transitions between paragraphs
+- Include personal perspectives and reflections that feel authentic
+- Build an emotional connection with readers through relatable scenarios
+- Use metaphors and imagery to make abstract concepts tangible
+- Create a sense of continuity and progression through the chapter
 
 BOOK OUTLINE:
 ${OUTLINE_CONTENT}
@@ -1715,64 +1785,15 @@ ${EXISTING_CHAPTERS}
 
 Write Chapter ${CHAPTER_NUM}: ${CHAPTER_TITLE}
 TARGET: ${MAX_WORDS} words, MINIMUM: ${MIN_WORDS} words"
-
-    # Prepare JSON payload using jq for proper escaping
-    CHAPTER_JSON_PAYLOAD=$(jq -n \
-        --arg system "$CHAPTER_SYSTEM_PROMPT" \
-        --arg user "$CHAPTER_USER_PROMPT" \
-        --argjson temp "$TEMPERATURE" \
-        --argjson topk "$TOP_K" \
-        --argjson topp "$TOP_P" \
-        --argjson maxtokens "$MAX_TOKENS" \
-        '{
-            "contents": [{
-                "parts": [{
-                    "text": ("SYSTEM: " + $system + "\n\nUSER: " + $user)
-                }]
-            }],
-            "generationConfig": {
-                "temperature": $temp,
-                "topK": $topk,
-                "topP": $topp,
-                "maxOutputTokens": $maxtokens
-            }
-        }')
-    # Debugging: Log JSON payload before sending
-    echo "Debug: JSON payload for Chapter $CHAPTER_NUM:" >> debug.log
-    echo "$CHAPTER_JSON_PAYLOAD" >> debug.log
-
-    # Validate JSON payload
-    if ! echo "$CHAPTER_JSON_PAYLOAD" | jq -e '.' > /dev/null 2>&1; then
-        echo "❌ Error: Invalid JSON payload for Chapter $CHAPTER_NUM"
-        echo "Debug: Invalid JSON payload:" >> debug.log
-        echo "$CHAPTER_JSON_PAYLOAD" >> debug.log
-        continue
-    fi
     
-    # Generate chapter with multi-provider fallback
+    # Generate chapter with smart_api_call directly 
     CHAPTER_RESPONSE=""
     GENERATION_SUCCESS=false
     
-    # First try with existing make_api_request
-    echo "🤖 Attempting chapter generation with primary API..."
-    pulse_animation
-    CHAPTER_RESPONSE=$(make_api_request "$CHAPTER_JSON_PAYLOAD")
-    if [ $? -eq 0 ] && echo "$CHAPTER_RESPONSE" | jq -e '.candidates[0].content.parts[0].text' > /dev/null 2>&1; then
-        GENERATION_SUCCESS=true
-        echo "✅ Primary API succeeded for Chapter $CHAPTER_NUM"
-    else
-        echo "⚠️  Primary API failed for Chapter $CHAPTER_NUM"
-        echo "Debug: Primary API response for Chapter $CHAPTER_NUM:" >> debug.log
-        echo "$CHAPTER_RESPONSE" >> debug.log
-        
-        # Try multi-provider system if available
-        if [ "$MULTI_PROVIDER_ENABLED" = "true" ]; then
-            echo "🔄 Trying multi-provider fallback for Chapter $CHAPTER_NUM..."
-            
-            # Create enhanced prompt for multi-provider system
-            system_prompt="You are a professional author writing a high-quality book. Write in $WRITING_STYLE style with $TONE tone. Ensure content is original, engaging, and valuable to readers."
-            
-            user_prompt="Write Chapter $CHAPTER_NUM: $CHAPTER_TITLE
+    # Create enhanced prompt for smart_api_call
+    system_prompt="You are a professional author writing a high-quality book. Write in $WRITING_STYLE style with $TONE tone. Ensure content is original, engaging, and valuable to readers."
+    
+    user_prompt="Write Chapter $CHAPTER_NUM: $CHAPTER_TITLE
 
 Book Outline Context:
 $(cat "$OUTLINE_FILE" 2>/dev/null || echo "No outline available")
@@ -1780,57 +1801,68 @@ $(cat "$OUTLINE_FILE" 2>/dev/null || echo "No outline available")
 Previous Chapters (for continuity):
 $EXISTING_CHAPTERS
 
-Requirements:
-- Write $MIN_WORDS-$MAX_WORDS words
-- Make it engaging and informative
-- Ensure smooth transitions and flow
-- Include practical examples where appropriate
+REQUIREMENTS:
+- Write $MIN_WORDS-$MAX_WORDS words of engaging narrative content
+- Ensure smooth transitions and flow between paragraphs
+- Include practical examples and vivid descriptions
 - Maintain consistency with previous chapters
 - Write in $WRITING_STYLE style with $TONE tone
 
-Begin writing the chapter now:"
-            
-            # Try smart API call
-            pulse_animation
-            echo "📝 Generating chapter content with AI..." >&2
-            MULTI_PROVIDER_RESULT=$(smart_api_call "$user_prompt" "$system_prompt" "creative" "$TEMPERATURE" 8192)
-            API_STATUS=$?
-            
-            snake_spinner
+CRITICAL FORMATTING REQUIREMENTS:
+- ONLY return the final chapter content - nothing else
+- DO NOT include any outline, notes, section numbers, or requirements in your output
+- DO NOT include phrases like 'Chapter X begins:' or 'Here is Chapter X'
+- DO NOT include any meta-text explaining what you're doing
+- DO NOT include any markdown separators (---)
+- DO NOT include any outline, chapter structure, or section labels
+- NEVER start with 'Chapter $CHAPTER_NUM: $CHAPTER_TITLE' (I'll add this myself)
+- NEVER include text saying this is a draft or sample
+- DO NOT include any comments or notes at the beginning or end
 
-            if [ $API_STATUS -eq 0 ] && [ -n "$MULTI_PROVIDER_RESULT" ]; then
-                # Convert to expected JSON format
-                CHAPTER_RESPONSE=$(jq -n --arg content "$MULTI_PROVIDER_RESULT" '{
-                    "candidates": [{
-                        "content": {
-                            "parts": [{"text": $content}]
-                        }
-                    }]
-                }')
-                GENERATION_SUCCESS=true
-                echo "✅ Multi-provider fallback succeeded for Chapter $CHAPTER_NUM"
-            else
-                echo "❌ Multi-provider fallback also failed for Chapter $CHAPTER_NUM"
-            fi
-        fi
+STRUCTURE AND CONTENT:
+- Start with a compelling opening hook
+- Use at least 90% narrative paragraphs (mandatory)
+- Limit bullet lists to a maximum of 1-2 in the entire chapter
+- If ending with a summary, use creative titles (not 'Conclusion')
+- Create clear transitions between major concepts
+- Avoid using subheadings that repeat the chapter title
+
+Begin writing the chapter content now:"
+    
+    # Use smart_api_call directly
+    echo "🤖 Generating chapter content with Ollama..." >&2
+    
+    # Improve handling by saving output to a file to avoid grep issues
+    loading_dots 10 "🔄 Generating Chapter $CHAPTER_NUM" &
+    MULTI_PROVIDER_RESULT=$(smart_api_call "$user_prompt" "$system_prompt" "creative" "$TEMPERATURE" 32000 "$MAX_RETRIES" "gemma3:1b")
+    API_STATUS=$?
+    
+    if [ $API_STATUS -eq 0 ] && [ -n "$MULTI_PROVIDER_RESULT" ]; then
+        # Convert to expected JSON format for compatibility with existing code
+        CHAPTER_RESPONSE=$(jq -n --arg content "$MULTI_PROVIDER_RESULT" '{
+            "candidates": [{
+                "content": {
+                    "parts": [{"text": $content}]
+                }
+            }]
+        }')
+        GENERATION_SUCCESS=true
+        echo "✅ Chapter generation succeeded for Chapter $CHAPTER_NUM"
+    else
+        echo "❌ Chapter generation failed for Chapter $CHAPTER_NUM"
     fi
     
     # Check if generation was successful
     if [ "$GENERATION_SUCCESS" = "false" ]; then
         echo ""
-        echo "❌ CRITICAL ERROR: Failed to generate Chapter $CHAPTER_NUM after all attempts"
-        echo "   Primary API: Failed"
-        if [ "$MULTI_PROVIDER_ENABLED" = "true" ]; then
-            echo "   Multi-provider fallback: Failed"
-        else
-            echo "   Multi-provider fallback: Not available"
-        fi
+        echo "❌ CRITICAL ERROR: Failed to generate Chapter $CHAPTER_NUM"
+        echo "   Ollama API: Failed"
         echo ""
         echo "🛑 Stopping book generation. Please check:"
-        echo "   1. API key validity"
-        echo "   2. Network connectivity"
-        echo "   3. Rate limits"
-        echo "   4. Multi-provider system setup"
+        echo "   1. Ollama is running (ollama serve)"
+        echo "   2. Required model is installed (llama3.2:1b or similar)"
+        echo "   3. Network connectivity to Ollama"
+        echo "   4. System resources available"
         echo ""
         echo "📄 Debug information has been logged to debug.log"
         echo ""
@@ -1861,11 +1893,188 @@ Begin writing the chapter now:"
         echo ""
         exit 1
     fi
+    
+    # IMPORTANT FIX: Check if the prompt got included in the response and extract only the actual content
+    if [[ "$CHAPTER_CONTENT" == *"Write Chapter $CHAPTER_NUM: $CHAPTER_TITLE"* ]]; then
+        echo "⚠️ Detected prompt in chapter content, extracting actual content only..."
+        # Find the last occurrence of "Begin writing the chapter content now:" and keep everything after it
+        FIXED_CONTENT=$(echo "$CHAPTER_CONTENT" | awk -v RS='Begin writing the chapter content now:' 'END{print $0}')
+        
+        # Only use the fixed content if it's not empty
+        if [ -n "$FIXED_CONTENT" ]; then
+            CHAPTER_CONTENT="$FIXED_CONTENT"
+            echo "✅ Successfully extracted actual chapter content"
+        else
+            echo "⚠️ Extraction failed, will apply regex filtering instead"
+        fi
+    fi
+    
+    # Enhanced cleanup - more comprehensive removal of meta-text, separators, notes, etc.
+    CHAPTER_CONTENT=$(echo "$CHAPTER_CONTENT" | 
+        # Check if the user prompt was included in the response and remove it
+        # This is a critical fix for the issue where the prompt is included in the chapter
+        sed "s/^Write Chapter $CHAPTER_NUM: $CHAPTER_TITLE.*Begin writing the chapter content now://s" |
+        
+        # Remove markdown separators
+        sed 's/^---$//g' |
+        # Remove content markers and metadata
+        sed 's/^Here is Chapter [0-9]*:$//gi' |
+        sed 's/^Chapter [0-9]* begins:$//gi' |
+        sed 's/^Chapter [0-9]*: .*$//gi' |
+        # Remove any lines that look like notes, instructions or AI responses
+        sed '/^Note:/d' |
+        sed '/^Certainly! Here is/d' |
+        sed '/^Here is the chapter/d' |
+        sed '/^Here is the content/d' |
+        sed '/^I hope this chapter/d' |
+        sed '/^I have written/d' |
+        sed '/^As requested/d' |
+        sed '/^This chapter follows/d' |
+        # Remove requirements or outline text
+        sed '/^REQUIREMENTS:/d' |
+        sed '/^OUTLINE:/d' |
+        sed '/^CHAPTER OUTLINE:/d' |
+        sed '/^Word count:/d' |
+        sed '/^Book Outline Context:/d' |
+        sed '/^Previous Chapters/d' |
+        sed '/^CRITICAL FORMATTING REQUIREMENTS:/d' |
+        sed '/^STRUCTURE AND CONTENT:/d' |
+        sed '/creative 0.95/d' |
+        
+        # Remove unnecessary whitespace at beginning/end
+        sed -e '/./,$!d' -e :a -e '/^\n*$/{$d;N;ba' -e '}'
+    )
 
     # Save chapter
     CHAPTER_FILE="${BOOK_DIR}/chapter_${CHAPTER_NUM}.md"
     echo "$CHAPTER_CONTENT" > "$CHAPTER_FILE"
     echo "✅ Chapter $CHAPTER_NUM saved to: $(basename "$CHAPTER_FILE")"
+    
+    # Show word count immediately after generation
+    CURRENT_WORD_COUNT=$(wc -w < "$CHAPTER_FILE" | tr -d ' ')
+    echo "📊 Initial Chapter $CHAPTER_NUM word count: $CURRENT_WORD_COUNT words"
+
+    # Secondary generation: If the chapter is below MIN_WORDS, ask the model to continue/expand and append
+    CURRENT_WORD_COUNT=$(wc -w < "$CHAPTER_FILE" | tr -d ' ')
+    if [ -n "$CURRENT_WORD_COUNT" ] && [ "$CURRENT_WORD_COUNT" -lt "$MIN_WORDS" ]; then
+        echo "ℹ️ Chapter $CHAPTER_NUM below minimum words ($CURRENT_WORD_COUNT/$MIN_WORDS). Requesting continuation..."
+
+        # Build a continuation prompt that re-uses the chapter content and asks for expansion without repeating
+        CONTINUE_PROMPT="The chapter below is currently ${CURRENT_WORD_COUNT} words and must be expanded to at least ${MIN_WORDS} words. Do NOT repeat material verbatim. Continue the chapter in the same voice and style, expanding ideas, adding examples, and improving transitions until the whole chapter reaches at least ${MIN_WORDS} words. 
+
+CRITICAL OUTPUT FORMAT REQUIREMENTS:
+- ONLY provide the continuation text that will be appended - NO separators, comments, or notes
+- Do NOT include phrases like 'here is the continuation' or 'this content could be appended'
+- NEVER include separator lines (---) or any other meta-content
+- Ensure all content flows naturally from the existing chapter
+- Maintain at least 75% narrative paragraph format (avoid lists and bullet points)
+- DO NOT use 'Conclusion' as a subheading - use creative alternatives if needed
+
+CURRENT CHAPTER:\n$CHAPTER_CONTENT\n\nProvide ONLY the additional content to be appended:"
+
+        # Try up to two continuation attempts to reach the minimum
+        CONT_ATTEMPT=1
+        MAX_CONT_ATTEMPTS=2
+        while [ "$CURRENT_WORD_COUNT" -lt "$MIN_WORDS" ] && [ $CONT_ATTEMPT -le $MAX_CONT_ATTEMPTS ]; do
+            echo "🔁 Continuation attempt $CONT_ATTEMPT for Chapter $CHAPTER_NUM..."
+            loading_dots 8 "🔄 Requesting continuation (attempt $CONT_ATTEMPT)" &
+            # Use phi4-mini model for more creative completions with better context handling
+            CONT_RESULT=$(smart_api_call "$CONTINUE_PROMPT" "$CHAPTER_SYSTEM_PROMPT" "creative" "$TEMPERATURE" "$MAX_TOKENS" "$MAX_RETRIES" "$(select_task_model "continuation" "phi4-mini:3.8b" "medium")")
+            wait # ensure loading dots finish
+
+            if [ $? -ne 0 ] || [ -z "$CONT_RESULT" ]; then
+                echo "⚠️ Continuation request failed (attempt $CONT_ATTEMPT)."
+                CONT_ATTEMPT=$((CONT_ATTEMPT + 1))
+                continue
+            fi
+
+            # If the provider returned a Gemini-style JSON, extract text, otherwise use raw
+            if echo "$CONT_RESULT" | jq -e '.candidates[0].content.parts[0].text' >/dev/null 2>&1; then
+                ADDITIONAL_TEXT=$(echo "$CONT_RESULT" | jq -r '.candidates[0].content.parts[0].text')
+            else
+                ADDITIONAL_TEXT="$CONT_RESULT"
+            fi
+
+            # Clean up the content - remove meta-text, separators, notes, etc.
+            ADDITIONAL_TEXT=$(echo "$ADDITIONAL_TEXT" | 
+                # Remove leading/trailing whitespace
+                sed 's/^\s\+//;s/\s\+$//' |
+                # Remove markdown separators
+                sed 's/^---$//g' |
+                # Remove content continuation markers
+                sed 's/^Here is the continuation:$//gi' |
+                sed 's/^Here is the additional content:$//gi' |
+                sed 's/^Content to be appended:$//gi' |
+                sed 's/^Additional text:$//gi' |
+                # Remove any lines that look like notes or instructions
+                sed '/^Note:/d' |
+                sed '/^This content could be appended/d' |
+                sed '/^I will now continue/d'
+            )
+
+            if [ -n "$ADDITIONAL_TEXT" ]; then
+                # Check if the additional text starts with heading markup
+                if [[ "$ADDITIONAL_TEXT" =~ ^#+ ]]; then
+                    # If it starts with headings, make sure to add a newline before
+                    echo -e "\n\n$ADDITIONAL_TEXT" >> "$CHAPTER_FILE"
+                else
+                    # Otherwise just append with paragraph break
+                    echo -e "\n\n$ADDITIONAL_TEXT" >> "$CHAPTER_FILE"
+                fi
+                echo "✅ Appended continuation to Chapter $CHAPTER_NUM (attempt $CONT_ATTEMPT)"
+            else
+                echo "⚠️ Continuation produced no additional text (attempt $CONT_ATTEMPT)"
+            fi
+
+            # Recompute word count
+            CURRENT_WORD_COUNT=$(wc -w < "$CHAPTER_FILE" | tr -d ' ')
+            echo "ℹ️ New word count for Chapter $CHAPTER_NUM: $CURRENT_WORD_COUNT words"
+            CONT_ATTEMPT=$((CONT_ATTEMPT + 1))
+        done
+
+        if [ "$CURRENT_WORD_COUNT" -lt "$MIN_WORDS" ]; then
+            echo "⚠️ After continuation attempts, Chapter $CHAPTER_NUM is still below the minimum words ($CURRENT_WORD_COUNT/$MIN_WORDS). It will be handled by the rewrite/autofill step later."
+        fi
+
+        # Reload CHAPTER_CONTENT for downstream checks
+        CHAPTER_CONTENT=$(cat "$CHAPTER_FILE")
+    fi
+    
+    # Word count check (moved up to immediately follow chapter generation)
+    CURRENT_WORD_COUNT=$(wc -w < "$CHAPTER_FILE" | tr -d ' ')
+    echo "📊 Chapter $CHAPTER_NUM word count: $CURRENT_WORD_COUNT words"
+    
+    # Enhanced clean-up of the chapter content to remove any remaining meta-text or separators
+    echo "🧹 Performing content cleanup..."
+    cat "$CHAPTER_FILE" | 
+        # Remove any markdown separators
+        sed '/^---$/d' |
+        # Remove lines that look like meta-text
+        sed '/^Certainly! Here is/d' |
+        sed '/^This new content builds/d' |
+        sed '/^Here is some new content/d' |
+        sed '/^Here is Chapter [0-9]*/d' |
+        sed '/^I will now continue/d' |
+        sed '/^Chapter [0-9]* begins:/d' |
+        sed '/^Here is the content for Chapter/d' |
+        sed '/^Note:/d' |
+        sed '/^This chapter/d' |
+        # Fix double blank lines (more than 2 consecutive newlines)
+        sed '/^$/N;/^\n$/D' > "${CHAPTER_FILE}.clean"
+    
+    # Replace original with cleaned version
+    mv "${CHAPTER_FILE}.clean" "$CHAPTER_FILE"
+    
+    # Final word count check
+    FINAL_WORD_COUNT=$(wc -w < "$CHAPTER_FILE" | tr -d ' ')
+    echo "📊 Chapter $CHAPTER_NUM final word count: $FINAL_WORD_COUNT words"
+
+    # Section splitting logic removed per user request
+    # IMPORTANT: This logic was intentionally removed to avoid word count issues
+    
+    # Re-check word count after cleanup
+    CURRENT_WORD_COUNT=$(wc -w < "$CHAPTER_FILE" | tr -d ' ')
+    echo "📊 Chapter $CHAPTER_NUM cleaned word count: $CURRENT_WORD_COUNT words"
 
     # NEW: Quality check with LanguageTool
     echo "🔍 Running quality check on Chapter $CHAPTER_NUM..."

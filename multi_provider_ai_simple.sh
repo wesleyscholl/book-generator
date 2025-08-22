@@ -40,6 +40,36 @@ rainbow_text() {
     printf "\r\033[K"
 }
 
+# Progress bar animation
+progress_bar() {
+    local duration=${1:-5}
+    local message="${2:-Loading}"
+    local width=30
+    local count=0
+    local total=$((duration * 10))
+    
+    while [ $count -lt $total ]; do
+        local progress=$((count * width / total))
+        local percent=$((count * 100 / total))
+        
+        # Create the bar
+        local bar="["
+        for ((i=0; i<width; i++)); do
+            if [ $i -lt $progress ]; then
+                bar+="${GREEN}=${RESET}"
+            else
+                bar+=" "
+            fi
+        done
+        bar+="]"
+        
+        printf "\r\033[K🔄 $message $bar ${BLUE}%d%%${RESET}" "$percent"
+        sleep 0.1
+        count=$((count + 1))
+    done
+    printf "\r\033[K"
+}
+
 setup_multi_provider_system() {
     echo "🔧 Initializing Multi-Provider AI System..."
     
@@ -92,51 +122,114 @@ setup_multi_provider_system() {
     return 0
 }
 
-# Smart API call with fallback logic
-smart_api_call() {
-    local prompt="$1"
-    local system_prompt="${2:-You are a helpful AI assistant.}"
-    local task_type="${3:-general}"
-    local temperature="${4:-0.7}"
-    local max_tokens="${5:-8192}"
-    local max_retries="${6:-3}"
-    
-    echo "🤖 Making smart API call..." >&2
-    
-    # # Try Gemini models with auto-cycling
-    # if [ -n "$GEMINI_API_KEY" ]; then
-    #     echo "📡 Trying Gemini models (starting with ${GEMINI_MODELS[$GEMINI_MODEL_INDEX]%%:*})..." >&2
-    #     if call_gemini_api "$prompt" "$system_prompt" "$temperature" "$max_tokens"; then
-    #         return 0
-    #     fi
-    #     echo "⚠️ All Gemini models failed or hit rate limits, trying alternatives" >&2
-    # fi
-    
-    # # Try Groq as fallback
-    # if [ -n "$GROQ_API_KEY" ]; then
-    #     echo "📡 Trying Groq..." >&2
-    #     if call_groq_api "$prompt" "$system_prompt" "$temperature" "$max_tokens"; then
-    #         return 0
-    #     fi
-    # fi
-    
-    # Try Ollama as last resort
-    if command -v ollama >/dev/null 2>&1; then
-        # Check if Ollama server is running
-        if curl -s --max-time 2 http://localhost:11434/api/version >/dev/null 2>&1; then
-            echo "📡 Trying Ollama local model..." >&2
-            if call_ollama_api "$prompt" "$system_prompt" "$temperature" "$max_tokens"; then
+# Smart API call with task-specific model selection and fallbacks
+function smart_api_call() {
+    # Expected canonical call signature used across the project:
+    # smart_api_call <prompt> <system_prompt> <task_type> <temperature> <max_tokens> <max_retries> <model>
+
+    local prompt="$1" # User prompt
+    local system_prompt="$2" # System prompt
+    local task_type="$3" # Task type
+    local temperature="$4" # Temperature
+    local max_tokens="$5" # Max tokens
+    local max_retries="$6" # Max retries
+    local model="$7" # Model
+
+    echo "$prompt $system_prompt $task_type $temperature $max_tokens $max_retries $model"
+
+    # Default system prompt if none provided
+    local default_system_prompt="Be helpful, accurate, and clear."
+
+    # Known short task type tokens (used by callers when they omit system_prompt)
+    local TASK_TYPES=("analytical" "creative" "plagiarism_check" "chapter_rewrite" "rewrite" "quality_check" "outline" "continuation" "general" "rewrite" "plagiarism_check" "summary")
+
+    # Helper to check if a value is a known task type
+    is_task_type() {
+        local v="$1"
+        for t in "${TASK_TYPES[@]}"; do
+            if [ "$v" = "$t" ]; then
                 return 0
             fi
-        else
-            echo "❌ Ollama server is not running. Try starting it with 'ollama serve'" >&2
+        done
+        return 1
+    }
+    
+    # Try to fetch a response with multiple fallback options
+    local success=false
+    local max_retries=3
+    local current_attempt=1
+    
+    # Prioritize faster/smaller models for better response times
+    # Start with fast small models and progress to larger ones if needed
+    local fallback_models=("llama3:8b" "llama3.2:1b" "llama3:latest" "gemma:7b" "tinyllama:latest" "mixtral:latest" "llama2:latest")
+    
+    # If model is specified, use it first, otherwise try default models
+    if [ -n "$model" ]; then
+        echo "🤖 Using specified model: $model" >&2
+        # call_ollama_api expects: prompt, system_prompt, task_type, temperature, max_tokens, model_name
+        if call_ollama_api "$prompt" "$system_prompt" "$task_type" "$temperature" "$max_tokens" "$max_retries" "$model"; then
+            success=true
         fi
-    else
-        echo "❌ Ollama is not installed. Please install it from https://ollama.com" >&2
     fi
     
-    echo "❌ All providers failed" >&2
-    return 1
+    # Ensure values are numeric for comparison
+    if ! [[ "$current_attempt" =~ ^[0-9]+$ ]]; then
+        echo "⚠️ Invalid current_attempt value: $current_attempt, setting to 1" >&2
+        current_attempt=1
+    fi
+    
+    if ! [[ "$max_retries" =~ ^[0-9]+$ ]]; then
+        echo "⚠️ Invalid max_retries value: $max_retries, setting to 3" >&2
+        max_retries=3
+    fi
+    
+    while [ "$success" = false ] && [ $current_attempt -le $max_retries ]; do
+        # Try each fallback model in turn
+        for fallback_model in "${fallback_models[@]}"; do
+            echo "🔄 Trying fallback model: $fallback_model (attempt $current_attempt/$max_retries)" >&2
+            if call_ollama_api "$prompt" "$system_prompt" "$task_type" "$temperature" "$max_tokens" "$max_retries" "$fallback_model"; then
+                success=true
+                break
+            fi
+            sleep 1
+        done
+        
+        # If still not successful, try Gemini
+        if [ "$success" = false ] && [ -n "$GEMINI_API_KEY" ]; then
+            echo "🔄 Trying Gemini API (attempt $current_attempt/$max_retries)" >&2
+            if call_gemini_api "$prompt" "$system_prompt" "$temperature" "$max_tokens"; then
+                success=true
+                break
+            fi
+            sleep 1
+        fi
+        
+        # If still not successful, try Groq
+        if [ "$success" = false ] && [ -n "$GROQ_API_KEY" ]; then
+            echo "🔄 Trying Groq API (attempt $current_attempt/$max_retries)" >&2
+            if call_groq_api "$prompt" "$system_prompt" "$temperature" "$max_tokens"; then
+                success=true
+                break
+            fi
+            sleep 1
+        fi
+        
+        # Increment attempt counter
+        current_attempt=$((current_attempt + 1))
+        
+        # If we're going to try again, wait a moment
+        if [ "$success" = false ] && [ $current_attempt -le $max_retries ]; then
+            sleep 2
+        fi
+    done
+    
+    # If we couldn't get a response from any provider, return an error
+    if [ "$success" = false ]; then
+        echo "❌ All AI providers failed to respond after $max_retries attempts" >&2
+        return 1
+    fi
+    
+    return 0
 }
 
 # Gemini models with rate limits
@@ -235,13 +328,16 @@ call_gemini_api() {
                     "maxOutputTokens": ($max | tonumber)
                 }
             }')
-        
-        local response=$(curl -s --max-time 60 \
-            -H "Content-Type: application/json" \
-            -H "x-goog-api-key: $GEMINI_API_KEY" \
-            -d "$payload" \
-            "$url")
-        
+
+    echo -e "🤖 Generating response with Ollama..." >&2
+    
+    # Make the API call
+    local response=$(curl -s --max-time 120 \
+        -H "Content-Type: application/json" \
+        -d "$payload" \
+        "$url")
+    local curl_exit_code=$?
+
         # Check for successful response
         if echo "$response" | jq -e '.candidates[0].content.parts[0].text' >/dev/null 2>&1; then
             echo "$response" | jq -r '.candidates[0].content.parts[0].text'
@@ -306,64 +402,221 @@ call_groq_api() {
     fi
 }
 
-# Ollama API call
+# Ollama API call with improved context handling
 call_ollama_api() {
-    local prompt="$1"
-    local system_prompt="$2"
-    local temperature="$3"
-    local max_tokens="$4"
+    local prompt="$1" # User prompt
+    local system_prompt="$2" # System prompt
+    local task_type="$3" # Task type
+    local temperature="$4" # Temperature
+    local max_tokens="$5" # Max tokens
+    local max_retries="$6" # Max retries
+    local model="$7" # Model
+
+    local LOG_FILE="multi_provider_logs/debug.log"
     
-    # Validate temperature is a number
-    if ! [[ "$temperature" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
-        echo "⚠️ Warning: Invalid temperature value '$temperature', defaulting to 0.7" >&2
+    # Create log directory if it doesn't exist
+    mkdir -p "$(dirname "$LOG_FILE")"
+    
+    echo "DEBUG: call_ollama_api started with prompt length: ${#prompt}, system_prompt length: ${#system_prompt}" >> "$LOG_FILE"
+    
+    # Validate temperature is a number and fix common format issues
+    # Handle missing or empty temperature
+    if [ -z "$temperature" ]; then
+        echo "⚠️ Warning: Empty temperature value, defaulting to 0.7" >&2
         temperature=0.7
-    fi
-    
-    # Choose appropriate model based on availability
-    local model_name="llama3.2:1b"
-    if ! ollama list 2>/dev/null | grep -q "$model_name"; then
-        # Fallback to other models if llama3.2:1b isn't available
-        model_name="llama3:8b"
-        if ! ollama list 2>/dev/null | grep -q "$model_name"; then
-            model_name="llama2:7b"
+    else
+        # First clean up the temperature value - convert '.65' to '0.65'
+        if [[ "$temperature" =~ ^\.[0-9]+$ ]]; then
+            temperature="0$temperature"
+            echo "⚠️ Note: Reformatted temperature from '.$temperature' to '$temperature'" >&2
+        fi
+        
+        # Now validate that it's a proper number
+        if ! [[ "$temperature" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+            echo "⚠️ Warning: Invalid temperature value '$temperature', defaulting to 0.7" >&2
+            temperature=0.7
+        fi
+        
+        # Ensure temperature is within valid range (0-2)
+        if (( $(echo "$temperature > 2.0" | bc -l) )); then
+            echo "⚠️ Warning: Temperature too high ($temperature), capping at 2.0" >&2
+            temperature=2.0
+        elif (( $(echo "$temperature < 0.0" | bc -l) )); then
+            echo "⚠️ Warning: Temperature too low ($temperature), setting to 0.1" >&2
+            temperature=0.1
         fi
     fi
     
-    echo "🖥️ Using local Ollama model: $model_name with temperature $temperature" >&2
+    # Choose appropriate model based on availability
+    if ! ollama list 2>/dev/null | grep -q "$model_name"; then
+        # First try popular high-quality models
+        local fallback_models=(
+            "llama3.1:8b"
+            "phi3:3.8b"
+            "phi4-mini:3.8b"
+            "gemma3:4b"
+            "gemma2:2b"
+            "llama3.2:1b"
+            "qwen2.5:1.5b"
+            "granite3:3b"
+        )
+        
+        for fallback in "${fallback_models[@]}"; do
+            if ollama list 2>/dev/null | grep -q "$fallback"; then
+                model_name="$fallback"
+                echo "⚠️ Model '$5' not found, using fallback: $model_name" >&2
+                break
+            fi
+        done
+    fi
+    
+    # Calculate optimal context window based on model and prompt size
+    local prompt_length=${#prompt}
+    local system_length=${#system_prompt}
+    local total_length=$((prompt_length + system_length + 200)) # Adding buffer
+    
+    # Set context window based on model capabilities
+    local ctx_window=4096
+    local num_batch=128
+    local stream=false
+    local top_k=40
+    local top_p=0.9
+    
+    # Adjust context window and batch size based on model
+    if [[ "$model_name" == *"llama3.1:8b"* ]]; then
+        ctx_window=8192
+        num_batch=256
+    elif [[ "$model_name" == *"phi3:3.8b"* ]] || [[ "$model_name" == *"phi4-mini"* ]]; then
+        ctx_window=4096
+        num_batch=192
+    elif [[ "$model_name" == *"gemma3"* ]]; then
+        ctx_window=8192
+        num_batch=256
+    elif [[ "$model_name" == *"granite"* ]]; then
+        ctx_window=16384
+        num_batch=512
+    fi
+
+    # Latency-focused overrides for specific models
+    # These reduce context, lower batch sizes, enable streaming, and tighten sampling to reduce wall-clock time
+    if [[ "$model_name" == *"qwen2:7b"* ]] || [[ "$model_name" == *"qwen2.5"* ]] || [[ "$model_name" == *"qwen2.5:14b"* ]]; then
+        ctx_window=4096
+        num_batch=32
+        stream=true
+        top_k=20
+        top_p=0.95
+        # Cap long responses by default to avoid long-running generations
+        if [ -z "$max_tokens" ] || [ "$max_tokens" -gt 2048 ]; then
+            max_tokens=2048
+        fi
+    fi
+
+    if [[ "$model_name" == *"gemma2:9b"* ]] || [[ "$model_name" == *"gemma2"* ]]; then
+        ctx_window=4096
+        num_batch=48
+        stream=true
+        top_k=30
+        top_p=0.95
+        if [ -z "$max_tokens" ] || [ "$max_tokens" -gt 4096 ]; then
+            max_tokens=4096
+        fi
+    fi
+    
+    # Write message directly without using grep in pipe
+    echo -e "🖥️  Using local Ollama model: $model_name with temperature $temperature" >&2
+    echo "DEBUG: Using model: $model_name, temperature: $temperature, max_tokens: $max_tokens, ctx: $ctx_window" >> "$LOG_FILE"
     
     local url="http://localhost:11434/api/generate"
-    local full_prompt="$system_prompt\n\n$prompt"
+    
+    # Format prompts according to model's preferred format
+    local formatted_prompt=""
+    if [[ "$model_name" == *"llama"* ]]; then
+        # LLaMA format
+        formatted_prompt="<|system|>\n$system_prompt\n\n<|user|>\n$prompt\n\n<|assistant|>"
+    elif [[ "$model_name" == *"phi"* ]]; then
+        # Phi format
+        formatted_prompt="<|system|>\n$system_prompt\n\n<|user|>\n$prompt\n\n<|assistant|>"
+    elif [[ "$model_name" == *"gemma"* ]]; then
+        # Gemma format
+        formatted_prompt="<start_of_turn>system\n$system_prompt<end_of_turn>\n<start_of_turn>user\n$prompt<end_of_turn>\n<start_of_turn>model"
+    else
+        # Default/generic format
+        formatted_prompt="System: $system_prompt\n\nUser: $prompt\n\nAssistant:"
+    fi
+    
+    echo "DEBUG: Using formatted prompt length: ${#formatted_prompt}" >> "$LOG_FILE"
     
     # Use jq to properly format the JSON payload
     local payload=$(jq -n \
-        --arg model "$model_name" \
-        --arg prompt "$full_prompt" \
+        --arg model "$model" \
+        --arg prompt "$formatted_prompt" \
         --argjson temp "$temperature" \
         --argjson max_tokens "$max_tokens" \
+        --argjson ctx_window "$ctx_window" \
+        --argjson num_batch "$num_batch" \
+        --argjson stream_val "$stream" \
+        --argjson topk "$top_k" \
+        --argjson topp "$top_p" \
         '{
             "model": $model,
             "prompt": $prompt,
-            "stream": false,
+            "stream": ($stream_val == true),
             "options": {
                 "temperature": $temp,
-                "max_tokens": $max_tokens
+                "max_tokens": $max_tokens,
+                "top_k": $topk,
+                "top_p": $topp,
+                "num_batch": $num_batch,
+                "num_ctx": $ctx_window
             }
         }')
     
-    # Debug output
-    # echo "Payload: $payload" >&2
+    echo "DEBUG: About to make curl request to Ollama" >> "$LOG_FILE"
     
-    local response=$(curl -s --max-time 120 \
+    # Command line for Ollama - verbose debug
+    # local response=$(ollama generate --model "$model" --prompt "$formatted_prompt" --temperature "$temperature" --max_tokens "$max_tokens" --ctx_window "$ctx_window" --num_batch "$num_batch" --stream "$stream" --top_k "$top_k" --top_p "$top_p")
+
+    # Make the API call with longer timeout for bigger models
+    local response=$(curl -s --max-time 300 \
         -H "Content-Type: application/json" \
         -d "$payload" \
         "$url")
+    local curl_exit_code=$?
+    
+    echo "DEBUG: curl completed with exit code: $curl_exit_code" >> "$LOG_FILE"
+    echo "DEBUG: Response length: ${#response} characters" >> "$LOG_FILE"
     
     # Check for successful response
     if echo "$response" | jq -e '.response' >/dev/null 2>&1; then
-        echo "$response" | jq -r '.response'
+        local extracted_response=$(echo "$response" | jq -r '.response')
+        
+        # BUGFIX: Remove the original prompt from the response
+        # The issue was that Ollama sometimes includes the original prompt in the response
+        # This fix ensures we only get the generated content, not the prompt
+        
+        # Remove system and user prompt parts that might be included
+        extracted_response=$(echo "$extracted_response" | sed -E 's/^.*<\|assistant\|>//g')
+        extracted_response=$(echo "$extracted_response" | sed -E 's/^.*<start_of_turn>model//g')
+        extracted_response=$(echo "$extracted_response" | sed -E 's/^.*Assistant://g')
+        
+        # Remove the original prompt text if it appears at the beginning
+        if [[ "$extracted_response" == *"$prompt"* ]]; then
+            extracted_response=$(echo "$extracted_response" | sed "s|$prompt||g")
+        fi
+        
+        # Remove any remaining system/user markers
+        extracted_response=$(echo "$extracted_response" | sed -E 's/<\|system\|>.*<\|user\|>//g')
+        extracted_response=$(echo "$extracted_response" | sed -E 's/<\|user\|>.*<\|assistant\|>//g')
+        
+        echo "DEBUG: Successfully extracted response, length: ${#extracted_response}" >> "$LOG_FILE"
+        echo -e "${GREEN}✓ Generated with $model_name${RESET}" >&2
+        echo "$extracted_response"
         return 0
     else
-        echo "❌ Ollama API error: $response" >&2
+        # Try to provide better error info
+        local error_message=$(echo "$response" | jq -r '.error // "Unknown error"')
+        echo "❌ Ollama API error with $model_name: $error_message" >&2
+        echo "DEBUG: Failed to extract .response from JSON, error: $error_message" >> "$LOG_FILE"
         return 1
     fi
 }

@@ -477,7 +477,7 @@ generate_outline_only() {
         # Show the created directory
         LATEST_DIR=$(ls -td ./book_outputs/*-* 2>/dev/null | head -1)
         if [ -n "$LATEST_DIR" ]; then
-            echo "📁 Book directory: $(basename "$LATEST_DIR")"
+            echo -e "📁 Book directory:\n   $(basename "$LATEST_DIR")"
         fi
     fi
 }
@@ -500,7 +500,7 @@ generate_outline_only_from_suggestion() {
         # Show the created directory
         LATEST_DIR=$(ls -td ./book_outputs/*-* 2>/dev/null | head -1)
         if [ -n "$LATEST_DIR" ]; then
-            echo "📁 Book directory: $(basename "$LATEST_DIR")"
+            echo -e "📁 Book directory:\n   $(basename "$LATEST_DIR")"
         fi
     fi
 }
@@ -1057,14 +1057,27 @@ compile_manuscript() {
 
 # Enhanced suggest_topics function that returns parameters for book generation
 suggest_topics() {
-    loading_dots 6 "➡️  📚 Generating 5 book topic suggestions"
-    CURRENT_DATE=$(date +"%B %Y")
-    SUGGESTION_PROMPT="Search the internet, research and collect 20 potential book topics, then randomly select 5 to provide detailed book suggestions based on the following criteria:
+    # Variable to keep track of previous suggestions for exclusion
+    local PREVIOUS_SUGGESTIONS=""
+    local ATTEMPT=1
+    
+    generate_topic_suggestions() {
+        loading_dots 8 "➡️  📚 Generating 5 book topic suggestions (Attempt ${ATTEMPT})"
+        CURRENT_DATE=$(date +"%B %Y")
+        
+        local exclusion_clause=""
+        if [ -n "$PREVIOUS_SUGGESTIONS" ]; then
+            exclusion_clause="IMPORTANT: Do NOT suggest any of these previous topics again: $PREVIOUS_SUGGESTIONS. Generate completely new topics that are different from previous suggestions."
+        fi
+        
+        SUGGESTION_PROMPT="Search the internet, research and collect 20 potential book topics, then randomly select 5 to provide detailed book suggestions based on the following criteria:
 - Topics and genres with demand and less saturation (e.g., from Kindle Direct Publishing trends).
 - Topics that solve narrowly defined reader problems, pain points, or frustrations.
 - Current ($CURRENT_DATE) in-demand topics with a high probability of success and low risk of failure.
 - Topics with potential for creating additional books (series, bundles, etc.).
 - Topics that are easier to create (less research required) and have low competition in the (sub) genre.
+- Include at least one fiction topic.
+- Ensure there are a wide variety of topics covered, including different genres and themes.
 
 Each suggestion MUST include these details in a structured format for EACH book:
 1. Topic/Title
@@ -1073,73 +1086,114 @@ Each suggestion MUST include these details in a structured format for EACH book:
 4. Writing Style (one of: detailed, narrative, academic, analytical, descriptive, persuasive, expository, technical)
 5. Tone (one of: professional, conversational, authoritative, casual, persuasive, humorous, inspirational, empathetic, bold)
 
+$exclusion_clause
+
 Important: Format your response as a numbered list 1-5, with each book having clear Title, Genre, Target Audience, Style and Tone. Do NOT include any text before or after the list."
-    ESCAPED_SUGGESTION_PROMPT=$(escape_json "$SUGGESTION_PROMPT")
-    SUGGESTION_JSON_PAYLOAD=$(jq -n \
-        --arg prompt "$SUGGESTION_PROMPT" \
-        '{
-            "contents": [{
-                "parts": [{
-                    "text": $prompt
-                }]
-            }],
-            "generationConfig": {
-                "temperature": 0.7,
-                "topK": 40,
-                "topP": 0.95,
-                "maxOutputTokens": 1500
-            }
-        }')
-    RESPONSE=$(make_api_request "$SUGGESTION_JSON_PAYLOAD")
+        
+        ESCAPED_SUGGESTION_PROMPT=$(escape_json "$SUGGESTION_PROMPT")
+        SUGGESTION_JSON_PAYLOAD=$(jq -n \
+            --arg prompt "$SUGGESTION_PROMPT" \
+            '{
+                "contents": [{
+                    "parts": [{
+                        "text": $prompt
+                    }]
+                }],
+                "generationConfig": {
+                    "temperature": 1.0,
+                    "topK": 40,
+                    "topP": 0.95,
+                    "maxOutputTokens": 1500
+                }
+            }')
+        RESPONSE=$(make_api_request "$SUGGESTION_JSON_PAYLOAD")
 
-    if [ $? -ne 0 ]; then
-        echo "❌ Failed to fetch suggestions. Please try again."
-        return 1
-    fi
+        if [ $? -ne 0 ]; then
+            echo "❌ Failed to fetch suggestions. Please try again."
+            return 1
+        fi
 
-    # Clean the response, only show the text from first numbered option through the end of the 5th suggestion
-    RES=$(echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text')
+        # Clean the response, only show the text from first numbered option through the end of the 5th suggestion
+        RES=$(echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text')
+        
+        # Strip all markdown formatting - including all asterisks (*)
+        SUGGESTIONS=$(echo "$RES" | sed 's/^[-*] //g; s/\*//g; s/^# //g; s/^## //g; s/^### //g;')
+        
+        # Append current suggestions to previous ones for exclusion in future generations
+        for i in {1..5}; do
+            local this_topic=$(echo "$SUGGESTIONS" | grep -i "^$i\." | sed 's/^[0-9]\.//' | sed 's/^[[:space:]]*//')
+            if [ -n "$this_topic" ]; then
+                if [ -z "$PREVIOUS_SUGGESTIONS" ]; then
+                    PREVIOUS_SUGGESTIONS="$this_topic"
+                else
+                    PREVIOUS_SUGGESTIONS="$PREVIOUS_SUGGESTIONS, $this_topic"
+                fi
+            fi
+        done
+        
+        return 0
+    }
     
-    # Extract only content between "1." and the end of suggestion 5 (two newlines after Tone in suggestion 5)
-    # RES=$(echo "$RES" | sed -n '/^1\./,/^5\./p')
-    # Get the 5th suggestion content
-    # SUGGESTION_5=$(echo "$RES" | sed -n '/^5\./,$p')
-    # # Find where Tone section ends in the 5th suggestion (we look for "Tone:" and a line break)
-    # TONE_LINE=$(echo "$SUGGESTION_5" | grep -n -i "Tone:" | grep -n -m 1 -A 3 "" | tail -n 1 | cut -d':' -f1)
-    # if [ -n "$TONE_LINE" ]; then
-    #     # Keep only lines up to 3 lines after the Tone line (to capture multi-line tone descriptions)
-    #     END_LINE=$((TONE_LINE + 3))
-    #     RES=$(echo "$RES" | head -n$(echo "$RES" | grep -n "^5\." | cut -d':' -f1 | head -1))
-    #     RES="${RES}$(echo "$SUGGESTION_5" | head -n$END_LINE)"
-    # fi
-    
-    # Strip all markdown formatting - including all asterisks (*)
-    SUGGESTIONS=$(echo "$RES" | sed 's/^[-*] //g; s/\*//g; s/^# //g; s/^## //g; s/^### //g;')
-    
-    # Clear the terminal and show suggestions
-    clear
-    echo "✅ Suggestions received:"
-    echo ""
-    echo ""
-    echo "$SUGGESTIONS"
-    echo ""
-    echo "Please select one of the options above by entering the corresponding number (1-5):"
-    read -p "Your choice: " selected_option
-
-    if [[ ! "$selected_option" =~ ^[1-5]$ ]]; then
-        echo "❌ Invalid selection. Please try again."
+    # Generate initial suggestions
+    if ! generate_topic_suggestions; then
         return 1
     fi
     
-    # Extract the selected suggestion
-    SELECTED_SUGGESTION=$(echo "$SUGGESTIONS" | sed -n "/^$selected_option\./,/^$((selected_option+1))\.|$/p" | sed "/^$((selected_option+1))\./d")
+    while true; do
+        # Clear the terminal and show suggestions
+        clear
+        echo "✅ Suggestions received:"
+        echo ""
+        echo ""
+        echo "$SUGGESTIONS"
+        echo ""
+        echo "6. Generate more topics"
+        echo ""
+        echo "Please select one of the options above by entering the corresponding number (1-6):"
+        read -p "Your choice: " selected_option
+
+        if [[ "$selected_option" = "6" ]]; then
+            # User wants more suggestions
+            ATTEMPT=$((ATTEMPT + 1))
+            if ! generate_topic_suggestions; then
+                return 1
+            fi
+            continue
+        elif [[ ! "$selected_option" =~ ^[1-5]$ ]]; then
+            echo "❌ Invalid selection. Please choose a number between 1-6."
+            sleep 2
+            continue
+        else
+            # Valid selection (1-5), proceed with the book generation
+            break
+        fi
+    done
+    
+    # Extract the selected suggestion robustly: capture from the selected numbered line
+    # up to (but not including) the next numbered suggestion. Use awk for reliable parsing.
+    SELECTED_SUGGESTION=$(echo "$SUGGESTIONS" | awk -v n="$selected_option" '
+    BEGIN {printing=0; pattern = "^" n "\\."}
+    {
+        if ($0 ~ pattern) { printing=1 }
+        else if (printing && $0 ~ /^[0-9]+\./) { exit }
+        if (printing) print
+    }')
+
+    # Trim leading/trailing whitespace from the extracted block
+    SELECTED_SUGGESTION=$(echo "$SELECTED_SUGGESTION" | sed -e 's/^\s\+//' -e 's/\s\+$//')
     
     # Parse the suggestion to extract parameters
-    TOPIC=$(echo "$SELECTED_SUGGESTION" | grep -i "Title\|Topic" | sed 's/.*[Tt]itle[: ]*//' | sed 's/.*[Tt]opic[: ]*//' | sed 's/^[[:space:]]*//')
-    GENRE=$(echo "$SELECTED_SUGGESTION" | grep -i "Genre" | sed 's/.*[Gg]enre[: ]*//' | sed 's/^[[:space:]]*//')
-    AUDIENCE=$(echo "$SELECTED_SUGGESTION" | grep -i "Audience" | sed 's/.*[Aa]udience[: ]*//' | sed 's/^[[:space:]]*//')
-    STYLE=$(echo "$SELECTED_SUGGESTION" | grep -i "Style" | sed 's/.*[Ss]tyle[: ]*//' | sed 's/^[[:space:]]*//' | tr '[:upper:]' '[:lower:]')
-    TONE=$(echo "$SELECTED_SUGGESTION" | grep -i "Tone" | sed 's/.*[Tt]one[: ]*//' | sed 's/^[[:space:]]*//' | tr '[:upper:]' '[:lower:]')
+    # Extract fields from the selected suggestion block safely (only first matching lines)
+    TOPIC=$(echo "$SELECTED_SUGGESTION" | awk 'BEGIN{IGNORECASE=1} /Title|Topic/ {sub(/^[^:]*:[[:space:]]*/, ""); print; exit}')
+    GENRE=$(echo "$SELECTED_SUGGESTION" | awk 'BEGIN{IGNORECASE=1} /Genre/ {sub(/^[^:]*:[[:space:]]*/, ""); print; exit}')
+    AUDIENCE=$(echo "$SELECTED_SUGGESTION" | awk 'BEGIN{IGNORECASE=1} /Audience/ {sub(/^[^:]*:[[:space:]]*/, ""); print; exit}')
+    STYLE=$(echo "$SELECTED_SUGGESTION" | awk 'BEGIN{IGNORECASE=1} /Style/ {sub(/^[^:]*:[[:space:]]*/, ""); print; exit}' | tr '[:upper:]' '[:lower:]')
+    TONE=$(echo "$SELECTED_SUGGESTION" | awk 'BEGIN{IGNORECASE=1} /Tone/ {sub(/^[^:]*:[[:space:]]*/, ""); print; exit}' | tr '[:upper:]' '[:lower:]')
+
+    # Fallback: if TOPIC seems empty, try to extract the first non-empty line of the block
+    if [ -z "$TOPIC" ]; then
+        TOPIC=$(echo "$SELECTED_SUGGESTION" | sed -n '1,3p' | sed '/^\s*$/d' | head -1)
+    fi
     
     # Set default style if not found or invalid
     if ! [[ "$STYLE" =~ ^(detailed|narrative|academic|analytical|descriptive|persuasive|expository|technical)$ ]]; then
