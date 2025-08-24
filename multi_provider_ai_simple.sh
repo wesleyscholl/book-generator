@@ -135,7 +135,8 @@ function smart_api_call() {
     local max_retries="$6" # Max retries
     local model="$7" # Model
 
-    echo "$prompt $system_prompt $task_type $temperature $max_tokens $max_retries $model"
+    # Debug output (commented out to avoid including prompt in response)
+    # echo "$prompt $system_prompt $task_type $temperature $max_tokens $max_retries $model" >&2
 
     # Default system prompt if none provided
     local default_system_prompt="Be helpful, accurate, and clear."
@@ -523,7 +524,7 @@ call_ollama_api() {
     fi
     
     # Write message directly without using grep in pipe
-    echo -e "🖥️  Using local Ollama model: $model_name with temperature $temperature" >&2
+    echo -e "🖥️  Using local Ollama model: $model with temperature $temperature" >&2
     echo "DEBUG: Using model: $model_name, temperature: $temperature, max_tokens: $max_tokens, ctx: $ctx_window" >> "$LOG_FILE"
     
     local url="http://localhost:11434/api/generate"
@@ -632,19 +633,34 @@ generate_outline_with_smart_api() {
     local style="${4:-detailed}"
     local tone="${5:-professional}"
     
-    local system_prompt="You are an expert book author and publishing professional with extensive experience in creating compelling book outlines that sell well and engage readers."
+    local system_prompt="You are an expert book author and publishing professional tasked with creating high-quality, commercially viable books for publication on KDP and other platforms. Your goal is to produce engaging, well-structured, and professionally written content that readers will find valuable and enjoyable.
+
+Create detailed book outlines that will guide the generation of 20,000-25,000 word books with 12-15 chapters of 1,500-2,000 words each.
+
+When creating outlines, always format chapter titles clearly as:
+Chapter 1: [Title]
+Chapter 2: [Title]
+etc.
+
+Include comprehensive chapter summaries that will guide detailed content generation. DO NOT include any markdown characters or formatting other than numbered lists."
     
-    local user_prompt="Create a comprehensive book outline for a ${genre} book about '${topic}' targeting ${audience}.
+    local user_prompt="Create a detailed outline for a ${genre} book about '${topic}' targeting ${audience}.
 
-Requirements:
-- Include 12-15 chapters with compelling titles
-- Each chapter should have a 2-3 sentence summary
-- Focus on ${style} writing style with ${tone} tone
-- Ensure logical flow and progression
-- Include practical value for the target audience
-- Make it commercially appealing
+REQUIRED FORMAT - Use this exact format for chapters:
+Chapter 1: [Chapter Title]
+Chapter 2: [Chapter Title]
+[etc.]
 
-Format the outline clearly with chapter numbers, titles, and summaries."
+Include:
+- Compelling book title and subtitle
+- 12-15 chapters with descriptive titles
+- 2-3 sentence summary for each chapter explaining what will be covered
+- Character profiles (fiction) or key concept definitions (non-fiction)
+- 3-5 core themes to weave throughout the book
+- Target reading level and tone guidance
+- Suggested word count distribution
+
+Make sure chapter titles are specific and promise clear value to readers. DO NOT include any markdown characters or formatting other than numbered lists."
     
     smart_api_call "$user_prompt" "$system_prompt" "analytical" 0.7 8192
 }

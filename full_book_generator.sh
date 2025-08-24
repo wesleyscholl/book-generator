@@ -94,7 +94,7 @@ MODEL="gemini-1.5-flash-latest"
 TEMPERATURE=0.95
 TOP_K=40
 TOP_P=0.9
-MAX_TOKENS=8192
+MAX_TOKENS=128000
 MAX_RETRIES=1
 MIN_WORDS=2000
 MAX_WORDS=2500
@@ -108,7 +108,7 @@ CHAPTERS_ONLY=""
 ENABLE_PLAGIARISM_CHECK=true
 PLAGIARISM_CHECK_STRICTNESS="low"  # low, medium, high
 AUTO_REWRITE_ON_FAIL=true
-ORIGINALITY_THRESHOLD=4  # Minimum score out of 10
+ORIGINALITY_THRESHOLD=5  # Minimum score out of 10
 PLAGIARISM_RECHECK_LIMIT=1  # Maximum retries for rewritten content
 
 show_help() {
@@ -287,6 +287,531 @@ $chapter_content"
     return $return_code
 }
 
+# Function for classic loading dots
+loading_dots() {
+    local duration=${1:-3}
+    local message="${2:-Loading}"
+    local count=0
+    local max_dots=3
+    
+    while [ $count -lt $((duration * 10)) ]; do
+        local dots=$((count % (max_dots + 1)))
+        printf "\r\033[K⏳ $message"
+        for ((i=0; i<dots; i++)); do
+            printf "."
+        done
+        sleep 0.1
+        count=$((count + 1))
+    done
+    printf "\r\033[K"
+}
+
+    # ANSI color codes
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+MAGENTA='\033[0;35m'
+CYAN='\033[0;36m'
+WHITE='\033[1;37m'
+RESET='\033[0m'
+
+# Rate limiting variables
+API_CALLS_FILE="/tmp/book_generator_api_calls.txt"
+API_CALLS_TODAY_FILE="/tmp/book_generator_api_calls_today.txt"
+MAX_CALLS_PER_MINUTE=15
+MAX_CALLS_PER_DAY=1500
+MINUTE_INTERVAL=60  # Seconds in a minute
+DAY_INTERVAL=86400  # Seconds in a day
+CURRENT_DAY=$(date +%Y-%m-%d)
+
+# Initialize API call tracking files if they don't exist
+initialize_api_tracking() {
+    # Initialize or validate the minute tracking file
+    if [ ! -f "$API_CALLS_FILE" ]; then
+        # Create the file with initial timestamp and counter
+        echo "$(date +%s) 0" > "$API_CALLS_FILE"
+    fi
+    
+    # Initialize or validate the daily tracking file
+    if [ ! -f "$API_CALLS_TODAY_FILE" ]; then
+        echo "$CURRENT_DAY 0" > "$API_CALLS_TODAY_FILE"
+    else
+        # Check if the day has changed
+        local stored_day=$(cat "$API_CALLS_TODAY_FILE" | cut -d' ' -f1)
+        if [ "$stored_day" != "$CURRENT_DAY" ]; then
+            # Reset for a new day
+            echo "$CURRENT_DAY 0" > "$API_CALLS_TODAY_FILE"
+        fi
+    fi
+}
+
+# Reset API call tracking counters to zero
+reset_api_tracking() {
+    local current_timestamp=$(date +%s)
+    
+    # Reset minute counter
+    echo "$current_timestamp 0" > "$API_CALLS_FILE"
+    
+    # Reset daily counter
+    echo "$CURRENT_DAY 0" > "$API_CALLS_TODAY_FILE"
+    
+    echo -e "${GREEN}✓${RESET} API tracking counters have been reset to zero."
+    show_api_usage
+}
+
+# Animation function for waiting periods
+show_wait_animation() {
+    local message="${1:-Waiting...}"
+    local animation_chars=("⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏")
+    local i=0
+
+    # PID file used as sentinel; removing it stops the animation loop.
+    local WAIT_PID_FILE="${WAIT_ANIM_PID_FILE:-/tmp/book_wait_anim.pid}"
+
+    # Write our PID so stopper can target this specific animation
+    printf "%s" "$$" > "$WAIT_PID_FILE" 2>/dev/null || true
+
+    # Hide cursor
+    echo -en "\033[?25l"
+
+    # Ensure cleanup on unexpected exit
+    trap 'rm -f "$WAIT_PID_FILE" >/dev/null 2>&1; echo -en "\033[?25h"; exit' INT TERM EXIT
+
+    # Loop until the PID file is removed by stop_wait_animation
+    while [ -f "$WAIT_PID_FILE" ]; do
+        local char="${animation_chars[$i]}"
+        echo -ne "\r${CYAN}${char}${RESET} ${message}     "
+        i=$(((i + 1) % ${#animation_chars[@]}))
+        sleep 0.1
+    done
+
+    # Completed; show checkmark and restore cursor
+    echo -e "\r\033[K${GREEN}✓${RESET} ${message} completed!     "
+    echo -en "\033[?25h"
+
+    # Remove trap and ensure sentinel removed
+    trap - INT TERM EXIT
+    rm -f "$WAIT_PID_FILE" >/dev/null 2>&1 || true
+}
+
+stop_wait_animation() {
+    local WAIT_PID_FILE="${WAIT_ANIM_PID_FILE:-/tmp/book_wait_anim.pid}"
+
+    if [ -f "$WAIT_PID_FILE" ]; then
+        local pid
+        pid=$(cat "$WAIT_PID_FILE" 2>/dev/null || true)
+        rm -f "$WAIT_PID_FILE" >/dev/null 2>&1 || true
+
+        # Best-effort: if the animation process still exists, try to kill it.
+        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+            kill "$pid" 2>/dev/null || true
+        fi
+    fi
+
+    # Restore cursor and clear the line
+    echo -e "\r\033[K${GREEN}✓${RESET} done.     "
+    echo -en "\033[?25h"
+}
+
+# ASCII progress bar drawer (reusable)
+draw_progress_bar() {
+    local percent=${1:-0}
+    local width=${2:-20}
+    local filled=$((percent * width / 100))
+    local empty=$((width - filled))
+
+    printf "["
+    if [ $filled -gt 0 ]; then
+        printf "%0.s=" $(seq 1 $filled)
+    fi
+    if [ $empty -gt 0 ]; then
+        printf "%0.s " $(seq 1 $empty)
+    fi
+    printf "] %d%%" "$percent"
+}
+
+# Function to select appropriate model based on task type and size requirements
+select_task_model() {
+    local task="$1"
+    local default_model="$2"
+    local size="$3"  # small, medium, large
+    
+    # If model exists, use it
+    if [ -n "$default_model" ] && ollama list 2>/dev/null | grep -q "$default_model"; then
+        echo "$default_model"
+        return 0
+    fi
+    
+    # Based on task and size, select appropriate model
+    case "$task" in
+        "continuation"|"creative")
+            case "$size" in
+                "small")
+                    for model in "phi4-mini:3.8b" "gemma3:4b" "phi3:3.8b" "llama3.2:1b" "llama3.1:8b"; do
+                        if ollama list 2>/dev/null | grep -q "$model"; then
+                            echo "$model"
+                            return 0
+                        fi
+                    done
+                    ;;
+                "medium")
+                    for model in "llama3.1:8b" "phi3:3.8b" "phi4-mini:3.8b" "gemma3:4b" "llama3.2:1b"; do
+                        if ollama list 2>/dev/null | grep -q "$model"; then
+                            echo "$model"
+                            return 0
+                        fi
+                    done
+                    ;;
+                "large"|*)
+                    for model in "llama3:70b" "llama3:latest" "mixtral:latest" "gemma3:27b" "llama3.1:8b"; do
+                        if ollama list 2>/dev/null | grep -q "$model"; then
+                            echo "$model"
+                            return 0
+                        fi
+                    done
+                    ;;
+            esac
+            ;;
+        "analytical"|"outline")
+            for model in "llama3.2:1b" "gemma3:4b" "phi3:3.8b" "llama3.1:8b" "llama3:latest"; do
+                if ollama list 2>/dev/null | grep -q "$model"; then
+                    echo "$model"
+                    return 0
+                fi
+            done
+            ;;
+        *)
+            # Default models for all other tasks
+            for model in "llama3.2:1b" "llama3:8b" "phi3:3.8b" "gemma3:4b" "llama3:latest"; do
+                if ollama list 2>/dev/null | grep -q "$model"; then
+                    echo "$model"
+                    return 0
+                fi
+            done
+            ;;
+    esac
+    
+    # Absolute fallback - just use any available model
+    local available_model=$(ollama list 2>/dev/null | grep -v "^NAME" | head -1 | awk '{print $1}')
+    if [ -n "$available_model" ]; then
+        echo "$available_model"
+        return 0
+    fi
+    
+    # If we got here, no models are available - return the default at least
+    echo "$default_model"
+    return 1
+}
+
+# Function to get book title from outline file for use as directory name
+get_book_title() {
+    local outline_response="$1"
+    local title=""
+    
+    # Try multiple patterns to extract the title, in order of preference
+    
+    # Method 1: Look for TITLE: at the beginning of a line
+    title=$(echo "$outline_response" | grep -i "^TITLE:" | head -1 | sed 's/^[Tt][Ii][Tt][Ll][Ee]:[[:space:]]*//')
+    
+    # Method 2: Look for "title:" or "Title:" anywhere in the text
+    if [ -z "$title" ]; then
+        title=$(echo "$outline_response" | grep -i "title:" | head -1 | sed 's/.*[Tt]itle:[[:space:]]*//')
+    fi
+    
+    # Method 3: Look for markdown header pattern (# Title)
+    if [ -z "$title" ]; then
+        title=$(echo "$outline_response" | grep -m 1 "^# " | sed "s/^# //" | sed "s/ *$//")
+    fi
+    
+    # Method 4: Extract "The Anxiety Toolkit for High-Achieving Women" from input prompt
+    if [ -z "$title" ]; then
+        title=$(echo "$outline_response" | grep -m 1 -o "'[^']*'" | sed "s/'//g")
+    fi
+    
+    # Method 5: Look for book title pattern with asterisks or formatting
+    if [ -z "$title" ]; then
+        title=$(echo "$outline_response" | grep -i -m 1 "\*\*book title\*\*" | sed 's/.*\*\*[Bb]ook [Tt]itle\*\*:*[[:space:]]*//')
+    fi
+    
+    # Method 6: Use first line if all else fails but trim it to reasonable length
+    if [ -z "$title" ]; then
+        title=$(echo "$outline_response" | head -1 | cut -c 1-50)
+        # Add an indicator that this is a fallback title
+        title="book-${title}"
+    fi
+    
+    # Clean up and normalize the title
+    # Remove any quotes, asterisks or other markdown formatting
+    title=$(echo "$title" | sed 's/[*"]//g' | sed "s/'//g" | sed 's/^\s*//' | sed 's/\s*$//')
+    
+    # Convert to lowercase and replace spaces with dashes
+    local sanitized=$(echo "$title" | tr '[:upper:]' '[:lower:]' | tr -s ' ' '-' | sed 's/[^a-z0-9-]//g')
+    
+    # Remove any leading dashes
+    sanitized=$(echo "$sanitized" | sed 's/^-*//')
+    
+    # Make sure we return something valid, default to "book" if empty
+    if [ -z "$sanitized" ]; then
+        echo "book"
+    else
+        echo "$sanitized"
+    fi
+}
+
+sanitize_outline_file() {
+    local infile="$1"
+    local tmpf
+    tmpf=$(mktemp)
+
+    awk '
+    BEGIN {
+        IGNORECASE=1;
+        chap_re = "^Chapter[[:space:]]*[0-9]+[[:space:]]*:";
+        in_chapter = 0;
+        summary_lines = 0;
+    }
+    {
+        if ($0 ~ chap_re) {
+            # Start a new chapter block
+            in_chapter = 1;
+            summary_lines = 0;
+            print $0;
+            next;
+        }
+        if (in_chapter) {
+            # Stop chapter block if next chapter header starts (handled above) or if we hit a metadata header
+            if ($0 ~ /^[[:space:]]*$/) {
+                # blank line counts as part of separation; allow one blank line
+                print "";
+                summary_lines++;
+                if (summary_lines >= 3) { in_chapter = 0 }
+                next;
+            }
+            # Stop if we encounter obvious metadata headings
+            if ($0 ~ /^(\*\*Subtitle|\*\*Themes|Themes:|Character Profiles|Key Concept|Key Concept Definitions|Target Reading Level|Suggested Word Count|Suggested Word Count Distribution|Suggested Word Count:|\-\-|\*\*|## )/i) {
+                in_chapter = 0;
+                next;
+            }
+            # Otherwise treat as summary line and print, but limit to 4 lines
+            if (summary_lines < 4) {
+                print $0;
+                summary_lines++;
+            } else {
+                in_chapter = 0;
+            }
+        }
+    }
+    ' "$infile" > "$tmpf"
+
+    # Renumber chapters sequentially starting at 1
+    if [ -s "$tmpf" ]; then
+        awk '
+        BEGIN { count = 0 }
+        /^Chapter[[:space:]]*[0-9]+[[:space:]]*:/ {
+            count++;
+            # extract everything after the colon
+            split($0, parts, ":");
+            title = parts[2];
+            # Trim leading spaces
+            sub(/^[[:space:]]+/, "", title);
+            print "Chapter " count ": " title;
+            next;
+        }
+        { print }
+        ' "$tmpf" > "${tmpf}.renumbered"
+
+        mv "${tmpf}.renumbered" "$infile"
+        rm -f "$tmpf"
+        echo "DEBUG: Sanitized outline (chapters only) saved to $infile" >> debug.log
+    else
+        rm -f "$tmpf"
+        echo "DEBUG: Sanitization produced empty result for $infile; leaving original" >> debug.log
+    fi
+}
+
+# Function to clean LLM output text by removing meta-text, prompts, and formatting artifacts
+clean_llm_output() {
+    local input_text="$1"
+    
+    # Process the text through a series of sed commands to clean it
+    echo "$input_text" | 
+        # Remove entire sections that match patterns (from start of pattern to next blank line)
+        sed '/^REQUIREMENTS:/,/^$/d' |
+        sed '/^OUTLINE:/,/^$/d' |
+        sed '/^CHAPTER OUTLINE:/,/^$/d' |
+        sed '/^Book Outline Context:/,/^$/d' |
+        sed '/^Previous Chapters/,/^$/d' |
+        sed '/^CRITICAL FORMATTING REQUIREMENTS:/,/^$/d' |
+        sed '/^STRUCTURE AND CONTENT:/,/^$/d' |
+        sed '/^BOOK OUTLINE:/,/^$/d' |
+        sed '/^EXISTING CHAPTERS:/,/^$/d' |
+        sed '/^CURRENT CHAPTER:/,/^$/d' |
+        sed '/^Chapter Rewrite:/,/^$/d' |
+
+        # Remove markdown separators
+        sed 's/^---$//g' |
+        sed 's/^===+$//g' |
+        
+        # Remove content markers and metadata
+        sed 's/^Here is Chapter [0-9]*:$//gi' |
+        sed 's/^Chapter [0-9]* begins:$//gi' |
+        sed 's/^Chapter [0-9]*: .*$//gi' |
+        sed 's/^Chapter [0-9]*\..*$//gi' |
+        sed 's/^Here is the continuation:$//gi' |
+        sed 's/^Here is the additional content:$//gi' |
+        sed 's/^Content to be appended:$//gi' |
+        sed 's/^Additional text:$//gi' |
+        sed 's/^Continuation:$//gi' |
+        
+        # Remove any lines that look like notes, instructions or AI responses
+        sed '/^Note:/d' |
+        sed '/^Certainly! Here is/d' |
+        sed '/^Here is the chapter/d' |
+        sed '/^Here is the content/d' |
+        sed '/^I hope this chapter/d' |
+        sed '/^I have written/d' |
+        sed '/^As requested/d' |
+        sed '/^This chapter follows/d' |
+        sed '/^Word count:/d' |
+        sed '/creative 0.[0-9]*/d' |
+        sed '/^Let me write/d' |
+        sed '/^This content could be appended/d' |
+        sed '/^I will now continue/d' |
+        sed '/^Continuing from/d' |
+        sed '/^Here is how I would continue/d' |
+        sed '/^I will append/d' |
+        sed '/^To continue the/d' |
+        
+        # Remove any continuation meta-text
+        sed '/^Continuing chapter/d' |
+        sed '/^Continuing Chapter/d' |
+        sed '/^Continuation of Chapter/d' |
+        sed '/^Continuing the story/d' |
+        sed '/^Additional content for/d' |
+
+        # Remove any Writing Guidelines text
+        sed '/^WRITING GUIDELINES:/d' |
+
+        # Remove any plagiarism check text
+        sed '/^PLAGIARISM\/COPYRIGHT ANALYSIS:/d' |
+        sed '/^ORIGINALITY_SCORE:/d' |
+        sed '/^PLAGIARISM_RISK:/d' |
+        sed '/^COPYRIGHT_RISK:/d' |
+        sed '/^ISSUES_FOUND:/d' |
+
+        # Remove common outline formats
+        sed '/^[0-9]\. /d' |
+        sed '/^\* /d' |
+        sed '/^- /d' |
+        sed '/^•/d' |
+        
+        # Remove unnecessary whitespace at beginning/end
+        sed -e '/./,$!d' -e :a -e '/^\n*$/{$d;N;ba' -e '}'
+}
+
+# Function to show API usage dashboard
+show_api_usage() {
+    initialize_api_tracking
+    
+    local current_timestamp=$(date +%s)
+    local minute_ago=$((current_timestamp - MINUTE_INTERVAL))
+    
+    # Read the minute tracking file
+    local timestamp_and_count=$(cat "$API_CALLS_FILE")
+    local last_timestamp=$(echo "$timestamp_and_count" | cut -d' ' -f1)
+    local minute_count=$(echo "$timestamp_and_count" | cut -d' ' -f2)
+    
+    # Read the day tracking file
+    local day_and_count=$(cat "$API_CALLS_TODAY_FILE")
+    local day_count=$(echo "$day_and_count" | cut -d' ' -f2)
+    
+    # Calculate time since first call in this minute window
+    local time_since_first_call=$((current_timestamp - last_timestamp))
+    local minute_reset_in=$((MINUTE_INTERVAL - time_since_first_call))
+    
+    # Calculate percentages
+    local minute_percent=$((minute_count * 100 / MAX_CALLS_PER_MINUTE))
+    local day_percent=$((day_count * 100 / MAX_CALLS_PER_DAY))
+    
+    # Draw ASCII progress bars (uses top-level draw_progress_bar)
+    
+    echo -e "\n${CYAN}════════════════ API USAGE DASHBOARD ════════════════${RESET}"
+    
+    # Per-minute usage
+    echo -e "${YELLOW}Per-Minute Usage:${RESET} $minute_count/$MAX_CALLS_PER_MINUTE calls"
+    echo -n "  "
+    draw_progress_bar $minute_percent
+    echo -e " (resets in ${minute_reset_in}s)"
+    
+    # Daily usage
+    echo -e "${YELLOW}Daily Usage:${RESET} $day_count/$MAX_CALLS_PER_DAY calls"
+    echo -n "  "
+    draw_progress_bar $day_percent
+    echo -e " (resets at midnight)"
+    
+    echo -e "${CYAN}════════════════════════════════════════════════${RESET}\n"
+}
+
+# Check rate limits and calculate necessary delay
+check_rate_limits() {
+    initialize_api_tracking
+    
+    local current_timestamp=$(date +%s)
+    local minute_ago=$((current_timestamp - MINUTE_INTERVAL))
+    
+    # Read the minute tracking file
+    local timestamp_and_count=$(cat "$API_CALLS_FILE")
+    local last_timestamp=$(echo "$timestamp_and_count" | cut -d' ' -f1)
+    local minute_count=$(echo "$timestamp_and_count" | cut -d' ' -f2)
+    
+    # Read the day tracking file
+    local day_and_count=$(cat "$API_CALLS_TODAY_FILE")
+    local day_count=$(echo "$day_and_count" | cut -d' ' -f2)
+    
+    # Check if minute interval has passed
+    if [ "$last_timestamp" -lt "$minute_ago" ]; then
+        # More than a minute has passed, reset minute counter
+        echo "$current_timestamp 1" > "$API_CALLS_FILE"
+        minute_count=1
+    else
+        # Increment the minute counter
+        minute_count=$((minute_count + 1))
+        echo "$last_timestamp $minute_count" > "$API_CALLS_FILE"
+    fi
+    
+    # Increment the day counter
+    day_count=$((day_count + 1))
+    echo "$CURRENT_DAY $day_count" > "$API_CALLS_TODAY_FILE"
+    
+    # Calculate delay if we're over the per-minute limit
+    local minute_delay=0
+    if [ "$minute_count" -gt "$MAX_CALLS_PER_MINUTE" ]; then
+        # Calculate time to wait until the minute rolls over
+        local time_since_first_call=$((current_timestamp - last_timestamp))
+        minute_delay=$((MINUTE_INTERVAL - time_since_first_call + 1))
+        
+        if [ "$minute_delay" -lt 1 ]; then
+            minute_delay=1
+        fi
+        
+        echo "⚠️ Per-minute rate limit reached ($minute_count/$MAX_CALLS_PER_MINUTE calls)"
+        # Show usage stats when we hit limits
+        show_api_usage
+    fi
+    
+    # Check if we're over the daily limit
+    if [ "$day_count" -gt "$MAX_CALLS_PER_DAY" ]; then
+        echo "❌ Daily rate limit exceeded! ($day_count/$MAX_CALLS_PER_DAY calls)"
+        echo "Daily API call limit has been reached. Please try again tomorrow."
+        return 1
+    fi
+    
+    # Return the delay needed
+    echo "$minute_delay"
+    return 0
+}
+
 # Function to rewrite chapter to address plagiarism/copyright issues
 rewrite_chapter_for_originality() {
     local chapter_file="$1"
@@ -416,238 +941,6 @@ Please rewrite the entire chapter with complete originality:"
     local backup_file="${chapter_file}.backup_$(date +%s)"
     cp "$chapter_file" "$backup_file"
     echo "📄 Original backed up to: $(basename "$backup_file")"
-
-    # ANSI color codes
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-BLUE='\033[0;34m'
-MAGENTA='\033[0;35m'
-CYAN='\033[0;36m'
-WHITE='\033[1;37m'
-RESET='\033[0m'
-
-# Rate limiting variables
-API_CALLS_FILE="/tmp/book_generator_api_calls.txt"
-API_CALLS_TODAY_FILE="/tmp/book_generator_api_calls_today.txt"
-MAX_CALLS_PER_MINUTE=15
-MAX_CALLS_PER_DAY=1500
-MINUTE_INTERVAL=60  # Seconds in a minute
-DAY_INTERVAL=86400  # Seconds in a day
-CURRENT_DAY=$(date +%Y-%m-%d)
-
-# Initialize API call tracking files if they don't exist
-initialize_api_tracking() {
-    # Initialize or validate the minute tracking file
-    if [ ! -f "$API_CALLS_FILE" ]; then
-        # Create the file with initial timestamp and counter
-        echo "$(date +%s) 0" > "$API_CALLS_FILE"
-    fi
-    
-    # Initialize or validate the daily tracking file
-    if [ ! -f "$API_CALLS_TODAY_FILE" ]; then
-        echo "$CURRENT_DAY 0" > "$API_CALLS_TODAY_FILE"
-    else
-        # Check if the day has changed
-        local stored_day=$(cat "$API_CALLS_TODAY_FILE" | cut -d' ' -f1)
-        if [ "$stored_day" != "$CURRENT_DAY" ]; then
-            # Reset for a new day
-            echo "$CURRENT_DAY 0" > "$API_CALLS_TODAY_FILE"
-        fi
-    fi
-}
-
-# Reset API call tracking counters to zero
-reset_api_tracking() {
-    local current_timestamp=$(date +%s)
-    
-    # Reset minute counter
-    echo "$current_timestamp 0" > "$API_CALLS_FILE"
-    
-    # Reset daily counter
-    echo "$CURRENT_DAY 0" > "$API_CALLS_TODAY_FILE"
-    
-    echo -e "${GREEN}✓${RESET} API tracking counters have been reset to zero."
-    show_api_usage
-}
-
-# Animation function for waiting periods
-show_wait_animation() {
-    local wait_time=$1
-    local message=$2
-    local animation_chars=("⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏")
-    local i=0
-    local start_time=$(date +%s)
-    local end_time=$((start_time + wait_time))
-    local current_time=$start_time
-    
-    # Hide cursor
-    echo -en "\033[?25l"
-    
-    while [ $current_time -lt $end_time ]; do
-        local remaining=$((end_time - current_time))
-        local char="${animation_chars[$i]}"
-        echo -ne "\r${CYAN}${char}${RESET} ${message} (${YELLOW}${remaining}s${RESET} remaining)     "
-        i=$(((i + 1) % ${#animation_chars[@]}))
-        sleep 0.1
-        current_time=$(date +%s)
-    done
-    
-    # Show cursor and clear line
-    echo -e "\r\033[K${GREEN}✓${RESET} ${message} completed!     "
-    echo -en "\033[?25h"
-}
-
-# ASCII progress bar drawer (reusable)
-draw_progress_bar() {
-    local percent=${1:-0}
-    local width=${2:-20}
-    local filled=$((percent * width / 100))
-    local empty=$((width - filled))
-
-    printf "["
-    if [ $filled -gt 0 ]; then
-        printf "%0.s=" $(seq 1 $filled)
-    fi
-    if [ $empty -gt 0 ]; then
-        printf "%0.s " $(seq 1 $empty)
-    fi
-    printf "] %d%%" "$percent"
-}
-
-# Function to sanitize book topic for use as folder name
-sanitize_book_title() {
-    local topic="$1"
-    
-    # Convert to lowercase, remove apostrophes, then replace non-alphanumeric with dashes
-    echo "$topic" \
-    | tr '[:upper:]' '[:lower:]' \
-    | sed "s/'//g" \
-    | sed -E 's/[^a-z0-9 ]//g' \
-    | tr -s ' ' '-' \
-    | sed -E 's/^-+//; s/-+$//' 
-}
-
-# Function to show API usage dashboard
-show_api_usage() {
-    initialize_api_tracking
-    
-    local current_timestamp=$(date +%s)
-    local minute_ago=$((current_timestamp - MINUTE_INTERVAL))
-    
-    # Read the minute tracking file
-    local timestamp_and_count=$(cat "$API_CALLS_FILE")
-    local last_timestamp=$(echo "$timestamp_and_count" | cut -d' ' -f1)
-    local minute_count=$(echo "$timestamp_and_count" | cut -d' ' -f2)
-    
-    # Read the day tracking file
-    local day_and_count=$(cat "$API_CALLS_TODAY_FILE")
-    local day_count=$(echo "$day_and_count" | cut -d' ' -f2)
-    
-    # Calculate time since first call in this minute window
-    local time_since_first_call=$((current_timestamp - last_timestamp))
-    local minute_reset_in=$((MINUTE_INTERVAL - time_since_first_call))
-    
-    # Calculate percentages
-    local minute_percent=$((minute_count * 100 / MAX_CALLS_PER_MINUTE))
-    local day_percent=$((day_count * 100 / MAX_CALLS_PER_DAY))
-    
-    # Draw ASCII progress bars (uses top-level draw_progress_bar)
-    
-    echo -e "\n${CYAN}════════════════ API USAGE DASHBOARD ════════════════${RESET}"
-    
-    # Per-minute usage
-    echo -e "${YELLOW}Per-Minute Usage:${RESET} $minute_count/$MAX_CALLS_PER_MINUTE calls"
-    echo -n "  "
-    draw_progress_bar $minute_percent
-    echo -e " (resets in ${minute_reset_in}s)"
-    
-    # Daily usage
-    echo -e "${YELLOW}Daily Usage:${RESET} $day_count/$MAX_CALLS_PER_DAY calls"
-    echo -n "  "
-    draw_progress_bar $day_percent
-    echo -e " (resets at midnight)"
-    
-    echo -e "${CYAN}════════════════════════════════════════════════${RESET}\n"
-}
-
-# Check rate limits and calculate necessary delay
-check_rate_limits() {
-    initialize_api_tracking
-    
-    local current_timestamp=$(date +%s)
-    local minute_ago=$((current_timestamp - MINUTE_INTERVAL))
-    
-    # Read the minute tracking file
-    local timestamp_and_count=$(cat "$API_CALLS_FILE")
-    local last_timestamp=$(echo "$timestamp_and_count" | cut -d' ' -f1)
-    local minute_count=$(echo "$timestamp_and_count" | cut -d' ' -f2)
-    
-    # Read the day tracking file
-    local day_and_count=$(cat "$API_CALLS_TODAY_FILE")
-    local day_count=$(echo "$day_and_count" | cut -d' ' -f2)
-    
-    # Check if minute interval has passed
-    if [ "$last_timestamp" -lt "$minute_ago" ]; then
-        # More than a minute has passed, reset minute counter
-        echo "$current_timestamp 1" > "$API_CALLS_FILE"
-        minute_count=1
-    else
-        # Increment the minute counter
-        minute_count=$((minute_count + 1))
-        echo "$last_timestamp $minute_count" > "$API_CALLS_FILE"
-    fi
-    
-    # Increment the day counter
-    day_count=$((day_count + 1))
-    echo "$CURRENT_DAY $day_count" > "$API_CALLS_TODAY_FILE"
-    
-    # Calculate delay if we're over the per-minute limit
-    local minute_delay=0
-    if [ "$minute_count" -gt "$MAX_CALLS_PER_MINUTE" ]; then
-        # Calculate time to wait until the minute rolls over
-        local time_since_first_call=$((current_timestamp - last_timestamp))
-        minute_delay=$((MINUTE_INTERVAL - time_since_first_call + 1))
-        
-        if [ "$minute_delay" -lt 1 ]; then
-            minute_delay=1
-        fi
-        
-        echo "⚠️ Per-minute rate limit reached ($minute_count/$MAX_CALLS_PER_MINUTE calls)"
-        # Show usage stats when we hit limits
-        show_api_usage
-    fi
-    
-    # Check if we're over the daily limit
-    if [ "$day_count" -gt "$MAX_CALLS_PER_DAY" ]; then
-        echo "❌ Daily rate limit exceeded! ($day_count/$MAX_CALLS_PER_DAY calls)"
-        echo "Daily API call limit has been reached. Please try again tomorrow."
-        return 1
-    fi
-    
-    # Return the delay needed
-    echo "$minute_delay"
-    return 0
-}
-
-# Function for classic loading dots
-loading_dots() {
-    local duration=${1:-3}
-    local message="${2:-Loading}"
-    local count=0
-    local max_dots=3
-    
-    while [ $count -lt $((duration * 10)) ]; do
-        local dots=$((count % (max_dots + 1)))
-        printf "\r\033[K⏳ $message"
-        for ((i=0; i<dots; i++)); do
-            printf "."
-        done
-        sleep 0.1
-        count=$((count + 1))
-    done
-    printf "\r\033[K"
-}
     
     # Removed section-splitting and section-specific quality checks per user request.
     # Instead we provide a helper that appends continuation text until min words are reached.
@@ -1213,43 +1506,40 @@ if [ -z "$CHAPTERS_ONLY" ]; then
     echo "📋 Step 1: Generating book outline..."
     
     SYSTEM_PROMPT=$(cat << 'EOF'
-You are an expert book author and publishing professional tasked with creating high-quality, commercially viable books for publication on KDP and other platforms. Your goal is to produce engaging, well-structured, and professionally written content that readers will find valuable and enjoyable.
+You are a professional book author and publishing consultant. Your job is to create detailed, commercially viable book outlines for KDP and other publishing platforms. The outlines must be structured, engaging, and practical for guiding 20,000-25,000 word books.
 
-When creating book outlines, you must always follow these strict formatting rules:
-- Chapters must be listed in the format: "Chapter X: Title"
-- Use consecutive numbers (1, 2, 3, …), no Roman numerals or bullets
-- Each chapter must include a 2-3 sentence summary immediately after the title
-- Do not include any Markdown (#, *, -, etc.)
-- Do not use quotation marks around titles
-- Do not include extra formatting or decorations
-- The number of chapters should be a minimum of 14 and a maximum of 20.
+Always follow these rules:
+- Books should have 14-20 chapters, each 1,500-2,000 words.
+- Format chapter headings as:
+  Chapter 1: [Title]
+  Chapter 2: [Title]
+  (and so on)
+- Provide clear 2-3 sentence summaries for each chapter.
+- Do NOT use markdown, bullet points, or formatting other than numbered chapter titles.
+- Output must be professional, polished, and ready for content generation.
 EOF
 )
 
-echo "Debug: SYSTEM_PROMPT before user prompt:" > debug.log
-echo "$SYSTEM_PROMPT" | head -n 10 >> debug.log  # Log first 10 lines for context
+    echo "Debug: SYSTEM_PROMPT before user prompt:" > debug.log
+    echo "$SYSTEM_PROMPT" | head -n 10 >> debug.log  # Log first 10 lines for context
 
-    USER_PROMPT="Create a detailed outline for a ${GENRE} book about '${TOPIC}' targeting ${AUDIENCE}.
+    USER_PROMPT="Create a detailed outline for a ${GENRE} book on '${TOPIC}' targeting ${AUDIENCE}.
 
-REQUIRED FORMAT:
-Chapter 1: [Chapter Title]
-[2-3 sentence summary]
-Chapter 2: [Chapter Title]
-[2-3 sentence summary]
-(continue for 14-20 chapters)
+REQUIRED ELEMENTS:
+1. A compelling book title and subtitle.
+2. 14-20 chapters, each with:
+   - Specific, value-driven titles.
+   - 2-3 sentence summaries of chapter content.
+3. Character profiles (fiction) OR key concept definitions (non-fiction).
+4. 3-5 core themes to reinforce throughout the book.
+5. Target reading level and tone guidance.
+6. Suggested word count distribution across chapters.
 
-Also include, at the end:
-1. A compelling book title and subtitle
-2. 3-5 core themes to weave throughout the book
-3. Character profiles (for fiction) or key concept definitions (for non-fiction)
-4. Target reading level and tone guidance
-5. Suggested word count distribution
+FORMAT RULES:
+- Use the exact chapter format: Chapter 1: [Title]
+- Do NOT include markdown, extra formatting, or commentary.
+- Output should be a clean, final outline only."
 
-STRICT REQUIREMENTS:
-- Chapters must always use the exact format: 'Chapter N: Title'
-- No Markdown, bullets, asterisks, or extra symbols
-- No indentation or numbering other than 'Chapter N'
-- All text must be plain text, easy to parse"
 
     echo "Debug: USER_PROMPT for outline generation:" > debug.log
     echo "$USER_PROMPT" >> debug.log
@@ -1257,8 +1547,8 @@ STRICT REQUIREMENTS:
     
     
     # Use smart_api_call directly instead of complex JSON payload construction
-    loading_dots 8 "🔄 Making API request for book outline generation" &
-    OUTLINE_RESPONSE=$(smart_api_call "$USER_PROMPT" "$SYSTEM_PROMPT" "analytical" "$TEMPERATURE" "$MAX_TOKENS" "$MAX_RETRIES" "gemma3:1b")
+    loading_dots 10 "🔄 Making API request for book outline generation" &
+    OUTLINE_RESPONSE=$(smart_api_call "$USER_PROMPT" "$SYSTEM_PROMPT" "analytical" "$TEMPERATURE" "$MAX_TOKENS" "$MAX_RETRIES" "llama3.2:1b")
     smart_api_result=$?
 
     # Error handling
@@ -1268,7 +1558,7 @@ STRICT REQUIREMENTS:
     fi
 
     # Create book-specific output directory
-    BOOK_TITLE_SANITIZED=$(sanitize_book_title "$TOPIC")
+    BOOK_TITLE_SANITIZED=$(get_book_title "$OUTLINE_RESPONSE")
     TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
     OUTPUT_DIR="./book_outputs/${BOOK_TITLE_SANITIZED}-${TIMESTAMP}"
     mkdir -p "$OUTPUT_DIR"
@@ -1276,81 +1566,7 @@ STRICT REQUIREMENTS:
     OUTLINE_FILE="${OUTPUT_DIR}/book_outline.md"
 
     echo "$OUTLINE_RESPONSE" > "$OUTLINE_FILE"
-    # Sanitize outline to extract only chapter headers and their summaries,
-    # then renumber chapters starting at 1 to avoid stray high-numbered entries
-    sanitize_outline_file() {
-        local infile="$1"
-        local tmpf
-        tmpf=$(mktemp)
 
-        awk '
-        BEGIN {
-            IGNORECASE=1;
-            chap_re = "^Chapter[[:space:]]*[0-9]+[[:space:]]*:";
-            in_chapter = 0;
-            summary_lines = 0;
-        }
-        {
-            if ($0 ~ chap_re) {
-                # Start a new chapter block
-                in_chapter = 1;
-                summary_lines = 0;
-                print $0;
-                next;
-            }
-            if (in_chapter) {
-                # Stop chapter block if next chapter header starts (handled above) or if we hit a metadata header
-                if ($0 ~ /^[[:space:]]*$/) {
-                    # blank line counts as part of separation; allow one blank line
-                    print "";
-                    summary_lines++;
-                    if (summary_lines >= 3) { in_chapter = 0 }
-                    next;
-                }
-                # Stop if we encounter obvious metadata headings
-                if ($0 ~ /^(\*\*Subtitle|\*\*Themes|Themes:|Character Profiles|Key Concept|Key Concept Definitions|Target Reading Level|Suggested Word Count|Suggested Word Count Distribution|Suggested Word Count:|\-\-|\*\*|## )/i) {
-                    in_chapter = 0;
-                    next;
-                }
-                # Otherwise treat as summary line and print, but limit to 4 lines
-                if (summary_lines < 4) {
-                    print $0;
-                    summary_lines++;
-                } else {
-                    in_chapter = 0;
-                }
-            }
-        }
-        ' "$infile" > "$tmpf"
-
-        # Renumber chapters sequentially starting at 1
-        if [ -s "$tmpf" ]; then
-            awk '
-            BEGIN { count = 0 }
-            /^Chapter[[:space:]]*[0-9]+[[:space:]]*:/ {
-                count++;
-                # extract everything after the colon
-                split($0, parts, ":");
-                title = parts[2];
-                # Trim leading spaces
-                sub(/^[[:space:]]+/, "", title);
-                print "Chapter " count ": " title;
-                next;
-            }
-            { print }
-            ' "$tmpf" > "${tmpf}.renumbered"
-
-            mv "${tmpf}.renumbered" "$infile"
-            rm -f "$tmpf"
-            echo "DEBUG: Sanitized outline (chapters only) saved to $infile" >> debug.log
-        else
-            rm -f "$tmpf"
-            echo "DEBUG: Sanitization produced empty result for $infile; leaving original" >> debug.log
-        fi
-    }
-
-    # Run sanitization on the generated outline to remove appended metadata
-    sanitize_outline_file "$OUTLINE_FILE"
     # Display path more cleanly to avoid terminal wrap issues
     echo -e "📃 Outline generated and saved to:\n   $OUTLINE_FILE"
 
@@ -1364,7 +1580,13 @@ STRICT REQUIREMENTS:
 
     # Review and Proofreading Step
     rainbow_text 2 "Preparing review step"
-    REVIEW_PROMPT="Review and proofread the following book outline for grammar, clarity, and structure. Suggest any necessary corrections or improvements. Ensure to keep the chapter titles and numbers intact. These chapters and numbers are required for the next steps in the book generation process. Also keep the book title at the top of the response.
+    REVIEW_SYSTEM_PROMPT="You are an expert editor. Your role is to proofread and improve book outlines while preserving their structure. Always return only the corrected outline, never feedback, commentary, or meta-text."
+
+    REVIEW_PROMPT="Proofread and improve the following book outline for grammar, clarity, and consistency. 
+- Keep the book title at the top. 
+- Keep all chapter numbers and order exactly as provided. 
+- Revise chapter titles and summaries only as needed for correctness and clarity. 
+- Return ONLY the corrected outline, with no explanations, notes, or commentary.
 
 OUTLINE:
 $OUTLINE_CONTENT"
@@ -1374,7 +1596,7 @@ $OUTLINE_CONTENT"
     echo "$OUTLINE_CONTENT" | head -n 10 >> debug.log  # Log first 10 lines for context
 
     loading_dots 10 "🔄 Making API request for review and proofreading" &
-    REVIEW_RESPONSE=$(smart_api_call "$REVIEW_PROMPT" "$SYSTEM_PROMPT" "analytical" 0.5 "$MAX_TOKENS" "$MAX_RETRIES" "qwen2:7b-instruct-q4_K_M")
+    REVIEW_RESPONSE=$(smart_api_call "$REVIEW_PROMPT" "$REVIEW_SYSTEM_PROMPT" "analytical" 0.5 "$MAX_TOKENS" "$MAX_RETRIES" "llama3.2:3b")
 
     if [ $? -ne 0 ]; then
         echo "❌ API request for review failed. Exiting."
@@ -1385,8 +1607,15 @@ $OUTLINE_CONTENT"
     echo "$REVIEW_RESPONSE" > "$REVIEWED_OUTLINE_FILE"
     # Sanitize reviewed outline as well
     sanitize_outline_file "$REVIEWED_OUTLINE_FILE"
-    # Display path more cleanly to avoid terminal wrap issues
-    echo -e "✅ Reviewed outline saved to:\n   $REVIEWED_OUTLINE_FILE"
+    review_save_result=$?
+    
+    if [ $review_save_result -eq 0 ] && [ -f "$REVIEWED_OUTLINE_FILE" ] && [ -s "$REVIEWED_OUTLINE_FILE" ]; then
+        # Display path more cleanly to avoid terminal wrap issues
+        echo -e "✅ Reviewed outline saved to:\n   $REVIEWED_OUTLINE_FILE"
+    else
+        echo "⚠️ Warning: There might have been an issue sanitizing the reviewed outline file"
+        # Don't exit, just continue with the potentially unsanitized file
+    fi
 
     # Second/Final Draft Step
     echo "DEBUG: Starting final draft step" >> debug.log
@@ -1412,7 +1641,14 @@ $OUTLINE_CONTENT"
     echo "DEBUG: First few lines of reviewed outline:" >> debug.log
     head -n 5 "$REVIEWED_OUTLINE_FILE" >> debug.log
 
-    FINAL_DRAFT_PROMPT="Improve the following book outline in any way possible. Focus on enhancing its quality, structure, and content. Ensure it is engaging and well-organized. Ensure to keep the chapter titles and numbers intact. These chapters and numbers are required for the next steps in the book generation process. Also keep the book title at the top of the response.
+    FINAL_DRAFT_SYSTEM_PROMPT="You are a professional book editor. Your task is to refine and elevate book outlines while preserving structure and numbering. Always output only the improved outline, never commentary or feedback."
+
+
+    FINAL_DRAFT_PROMPT="Refine and improve the following book outline to maximize quality, structure, and engagement. 
+- Keep the book title at the top. 
+- Keep all chapter numbers and order exactly as provided. 
+- Enhance chapter titles and summaries for clarity, flow, and appeal. 
+- Return ONLY the improved outline, with no explanations, notes, or commentary.
 
 OUTLINE:
 $(cat "$REVIEWED_OUTLINE_FILE")"
@@ -1421,7 +1657,7 @@ $(cat "$REVIEWED_OUTLINE_FILE")"
     echo "DEBUG: About to call smart_api_call for final draft" >> debug.log
 
     loading_dots 10 "🔄 Making API request for second/final draft" &
-    FINAL_DRAFT_RESPONSE=$(smart_api_call "$FINAL_DRAFT_PROMPT" "$SYSTEM_PROMPT" "creative" 0.4 "$MAX_TOKENS" "$MAX_RETRIES" "gemma3:1b")
+    FINAL_DRAFT_RESPONSE=$(smart_api_call "$FINAL_DRAFT_PROMPT" "$FINAL_DRAFT_SYSTEM_PROMPT" "creative" 0.4 "$MAX_TOKENS" "$MAX_RETRIES" "llama3.2:1b")
     final_draft_exit_code=$?
     
     echo "DEBUG: smart_api_call returned with exit code: $final_draft_exit_code" >> debug.log
@@ -1618,7 +1854,7 @@ OUTLINE_CONTENT=$(cat "$OUTLINE_FILE")
 TOTAL_WORDS=0
 
 # System prompt for chapter generation
-CHAPTER_SYSTEM_PROMPT="You are a professional book author specializing in creating immersive, narrative-driven chapters for publication. You excel at long-form storytelling with flowing paragraphs rather than lists or bullet points. Focus on creating rich, descriptive content that pulls readers into the subject through vivid language and emotional connection. Your writing style favors continuous narrative text over fragmented sections, creates memorable mental images, and maintains consistent pacing throughout each chapter. You produce only final, publication-ready text without meta-commentary, separators, or annotations. Do not include the book outline, notes, or any other extraneous information in the response."
+CHAPTER_SYSTEM_PROMPT="You are a professional book author. Write immersive, narrative-driven chapters in flowing long-form prose, not lists or fragments. Use vivid, descriptive language that creates strong imagery and emotional connection, with consistent pacing throughout. Always produce only final, publication-ready text — no meta notes, commentary, outlines, separators, or annotations."
 
 # Store chapters in an array to avoid pipe issues
 echo "DEBUG: Preparing to process chapters" >> debug.log
@@ -1721,120 +1957,41 @@ OUTLINE_CONTENT=$(echo "$OUTLINE_CONTENT" | sed 's/\*\*//g')
 
 # Create new loop, to extend generate more to the chapter file and join both to meet the minimum word count
 
-CHAPTER_USER_PROMPT="Write Chapter ${CHAPTER_NUM}: '${CHAPTER_TITLE}' based on the outline and existing chapters.
+CHAPTER_USER_PROMPT="Write Chapter ${CHAPTER_NUM}: '${CHAPTER_TITLE}' 
 
-CRITICAL LENGTH REQUIREMENT:
-- Write EXACTLY ${MIN_WORDS}-${MAX_WORDS} words (this is mandatory)
-- Do NOT write less than ${MIN_WORDS} words under any circumstances
-- Expand ideas fully to reach the required length naturally
-
-CRITICAL OUTPUT FORMAT REQUIREMENTS:
-- ONLY produce FINAL chapter content - NO comments, notes, placeholders, or separators (---)
-- NEVER include meta text like 'Here is the chapter' or 'This content could be appended'
-- NEVER acknowledge these instructions in your response
-- DO NOT use the word 'Conclusion' as a subheading - use creative alternatives instead
-- NEVER include text that suggests the content is a draft or sample
-- NEVER explain what you're doing or what you've written
-- NEVER include the book outline or any other chapters in your response
-- NEVER include any meta-text or commentary in your response
-- NEVER include any instructions or explanations in your response
-
-PARAGRAPH AND FORMATTING REQUIREMENTS:
-- At least 90% of content MUST be narrative paragraphs (this is mandatory)
-- Use no more than 1-2 bulleted or numbered lists in the entire chapter
-- Limit use of bold formatting to no more than 5 instances
-- Use subheadings sparingly (maximum 4-5 in total)
-- Write long form paragraphs and avoid fragmented sentences
-- If ending with a summary, use creative titles like 'Looking Ahead' or 'The Path Forward'
-- For the final paragraph, consider a seamless transition without a subheading
-
-PLAGIARISM AND ORIGINALITY:
-- Ensure all content is completely original, do not use any copyrighted material whatsoever
-- DO NOT plagiarize other authors' works
-- Always provide proper attribution for any sources used
-- Include citations and references for any quoted or paraphrased material
-- Use your own original words and ideas to express concepts
-- Avoid using generic phrases or clichés
-
-WRITING STYLE: ${WRITING_STYLE}
-${STYLE_INSTRUCTIONS}
-
-TONE: ${TONE}
-${TONE_INSTRUCTIONS}
-
-STRUCTURE REQUIREMENTS:
-- Start with a compelling opening hook
-- Focus on storytelling and narrative flow throughout
-- Present concepts as a cohesive journey rather than disconnected sections
-- Use descriptive language that creates vivid mental images
-- End with reflective thoughts that lead naturally to the next chapter
-
-CONTENT EXPANSION TECHNIQUES:
-- Elaborate on every concept with detailed explanations and rich descriptions
-- Develop flowing narrative with seamless transitions between paragraphs
-- Include personal perspectives and reflections that feel authentic
-- Build an emotional connection with readers through relatable scenarios
-- Use metaphors and imagery to make abstract concepts tangible
-- Create a sense of continuity and progression through the chapter
-
-BOOK OUTLINE:
-${OUTLINE_CONTENT}
-
-EXISTING CHAPTERS:
-${EXISTING_CHAPTERS}
-
-Write Chapter ${CHAPTER_NUM}: ${CHAPTER_TITLE}
-TARGET: ${MAX_WORDS} words, MINIMUM: ${MIN_WORDS} words"
-    
-    # Generate chapter with smart_api_call directly 
-    CHAPTER_RESPONSE=""
-    GENERATION_SUCCESS=false
-    
-    # Create enhanced prompt for smart_api_call
-    system_prompt="You are a professional author writing a high-quality book. Write in $WRITING_STYLE style with $TONE tone. Ensure content is original, engaging, and valuable to readers."
-    
-    user_prompt="Write Chapter $CHAPTER_NUM: $CHAPTER_TITLE
-
-Book Outline Context:
-$(cat "$OUTLINE_FILE" 2>/dev/null || echo "No outline available")
-
-Previous Chapters (for continuity):
-$EXISTING_CHAPTERS
+CONTEXT:
+- Book Outline: ${OUTLINE_CONTENT}
+- Existing Chapters: ${EXISTING_CHAPTERS}
 
 REQUIREMENTS:
-- Write $MIN_WORDS-$MAX_WORDS words of engaging narrative content
-- Ensure smooth transitions and flow between paragraphs
-- Include practical examples and vivid descriptions
-- Maintain consistency with previous chapters
-- Write in $WRITING_STYLE style with $TONE tone
+- Length: ${MIN_WORDS}-${MAX_WORDS} words (mandatory, no less than ${MIN_WORDS})
+- Style: ${WRITING_STYLE} | Tone: ${TONE}
+${STYLE_INSTRUCTIONS}
+${TONE_INSTRUCTIONS}
+- Content must be original (no plagiarism, no copyrighted text). Attribute sources if quoting.
 
-CRITICAL FORMATTING REQUIREMENTS:
-- ONLY return the final chapter content - nothing else
-- DO NOT include any outline, notes, section numbers, or requirements in your output
-- DO NOT include phrases like 'Chapter X begins:' or 'Here is Chapter X'
-- DO NOT include any meta-text explaining what you're doing
-- DO NOT include any markdown separators (---)
-- DO NOT include any outline, chapter structure, or section labels
-- NEVER start with 'Chapter $CHAPTER_NUM: $CHAPTER_TITLE' (I'll add this myself)
-- NEVER include text saying this is a draft or sample
-- DO NOT include any comments or notes at the beginning or end
+OUTPUT RULES:
+- Return ONLY the final narrative (no meta text, no notes, no placeholders, no outline restatement).
+- Do NOT start with “Chapter ${CHAPTER_NUM}” or similar — content only.
+- Never say 'Conclusion'; use creative endings or seamless transitions.
+- At least 90% must be narrative paragraphs.
+- Limit to max 1 bulleted/numbered list.
+- Use at most 4-5 subheadings, avoid repeating the chapter title.
+- Bold formatting: ≤ 5 uses.
 
-STRUCTURE AND CONTENT:
-- Start with a compelling opening hook
-- Use at least 90% narrative paragraphs (mandatory)
-- Limit bullet lists to a maximum of 1-2 in the entire chapter
-- If ending with a summary, use creative titles (not 'Conclusion')
-- Create clear transitions between major concepts
-- Avoid using subheadings that repeat the chapter title
-
-Begin writing the chapter content now:"
+STRUCTURE:
+- Begin with a strong opening hook.
+- Build flow and continuity with vivid, descriptive language.
+- Expand ideas fully with examples, metaphors, and emotional resonance.
+- Ensure smooth transitions between sections.
+- End reflectively, leading into the next chapter naturally."
     
     # Use smart_api_call directly
     echo "🤖 Generating chapter content with Ollama..." >&2
     
     # Improve handling by saving output to a file to avoid grep issues
     loading_dots 10 "🔄 Generating Chapter $CHAPTER_NUM" &
-    MULTI_PROVIDER_RESULT=$(smart_api_call "$user_prompt" "$system_prompt" "creative" "$TEMPERATURE" 32000 "$MAX_RETRIES" "gemma3:1b")
+    MULTI_PROVIDER_RESULT=$(smart_api_call "$user_prompt" "$system_prompt" "creative" "$TEMPERATURE" "$MAX_TOKENS" "$MAX_RETRIES" "llama3.2:1b")
     API_STATUS=$?
     
     if [ $API_STATUS -eq 0 ] && [ -n "$MULTI_PROVIDER_RESULT" ]; then
@@ -1909,41 +2066,14 @@ Begin writing the chapter content now:"
         fi
     fi
     
-    # Enhanced cleanup - more comprehensive removal of meta-text, separators, notes, etc.
-    CHAPTER_CONTENT=$(echo "$CHAPTER_CONTENT" | 
-        # Check if the user prompt was included in the response and remove it
-        # This is a critical fix for the issue where the prompt is included in the chapter
-        sed "s/^Write Chapter $CHAPTER_NUM: $CHAPTER_TITLE.*Begin writing the chapter content now://s" |
-        
-        # Remove markdown separators
-        sed 's/^---$//g' |
-        # Remove content markers and metadata
-        sed 's/^Here is Chapter [0-9]*:$//gi' |
-        sed 's/^Chapter [0-9]* begins:$//gi' |
-        sed 's/^Chapter [0-9]*: .*$//gi' |
-        # Remove any lines that look like notes, instructions or AI responses
-        sed '/^Note:/d' |
-        sed '/^Certainly! Here is/d' |
-        sed '/^Here is the chapter/d' |
-        sed '/^Here is the content/d' |
-        sed '/^I hope this chapter/d' |
-        sed '/^I have written/d' |
-        sed '/^As requested/d' |
-        sed '/^This chapter follows/d' |
-        # Remove requirements or outline text
-        sed '/^REQUIREMENTS:/d' |
-        sed '/^OUTLINE:/d' |
-        sed '/^CHAPTER OUTLINE:/d' |
-        sed '/^Word count:/d' |
-        sed '/^Book Outline Context:/d' |
-        sed '/^Previous Chapters/d' |
-        sed '/^CRITICAL FORMATTING REQUIREMENTS:/d' |
-        sed '/^STRUCTURE AND CONTENT:/d' |
-        sed '/creative 0.95/d' |
-        
-        # Remove unnecessary whitespace at beginning/end
-        sed -e '/./,$!d' -e :a -e '/^\n*$/{$d;N;ba' -e '}'
-    )
+    # First remove any specific prompts that might be included
+    # Use awk to safely extract everything after the last occurrence of the marker
+    if echo "$CHAPTER_CONTENT" | grep -q "Begin writing the chapter content now:"; then
+        CHAPTER_CONTENT=$(echo "$CHAPTER_CONTENT" | awk -v RS='Begin writing the chapter content now:' 'END{print $0}')
+    fi
+    
+    # Enhanced cleanup - use our reusable function for comprehensive removal of meta-text
+    CHAPTER_CONTENT=$(clean_llm_output "$CHAPTER_CONTENT")
 
     # Save chapter
     CHAPTER_FILE="${BOOK_DIR}/chapter_${CHAPTER_NUM}.md"
@@ -1957,20 +2087,23 @@ Begin writing the chapter content now:"
     # Secondary generation: If the chapter is below MIN_WORDS, ask the model to continue/expand and append
     CURRENT_WORD_COUNT=$(wc -w < "$CHAPTER_FILE" | tr -d ' ')
     if [ -n "$CURRENT_WORD_COUNT" ] && [ "$CURRENT_WORD_COUNT" -lt "$MIN_WORDS" ]; then
-        echo "ℹ️ Chapter $CHAPTER_NUM below minimum words ($CURRENT_WORD_COUNT/$MIN_WORDS). Requesting continuation..."
+        echo "⚠️ Chapter $CHAPTER_NUM below minimum words ($CURRENT_WORD_COUNT/$MIN_WORDS). Requesting continuation..."
 
         # Build a continuation prompt that re-uses the chapter content and asks for expansion without repeating
-        CONTINUE_PROMPT="The chapter below is currently ${CURRENT_WORD_COUNT} words and must be expanded to at least ${MIN_WORDS} words. Do NOT repeat material verbatim. Continue the chapter in the same voice and style, expanding ideas, adding examples, and improving transitions until the whole chapter reaches at least ${MIN_WORDS} words. 
+        CONTINUE_PROMPT="The chapter below is ${CURRENT_WORD_COUNT} words and must be expanded to at least ${MIN_WORDS} words. 
+Continue seamlessly in the same voice and style. Expand ideas, add examples, and improve transitions without repeating existing material.
 
-CRITICAL OUTPUT FORMAT REQUIREMENTS:
-- ONLY provide the continuation text that will be appended - NO separators, comments, or notes
-- Do NOT include phrases like 'here is the continuation' or 'this content could be appended'
-- NEVER include separator lines (---) or any other meta-content
-- Ensure all content flows naturally from the existing chapter
-- Maintain at least 75% narrative paragraph format (avoid lists and bullet points)
-- DO NOT use 'Conclusion' as a subheading - use creative alternatives if needed
+RULES:
+- Return ONLY new continuation text (no notes, separators, or meta text).
+- Do NOT restate the chapter or say 'here is the continuation.'
+- Maintain natural flow with at least 75% narrative paragraphs.
+- Limit lists to rare use; avoid bullet-heavy sections.
+- Do NOT use 'Conclusion' as a heading — use creative alternatives or smooth endings.
 
-CURRENT CHAPTER:\n$CHAPTER_CONTENT\n\nProvide ONLY the additional content to be appended:"
+CURRENT CHAPTER:
+$CHAPTER_CONTENT
+
+Write ONLY the continuation to append."
 
         # Try up to two continuation attempts to reach the minimum
         CONT_ATTEMPT=1
@@ -1995,22 +2128,11 @@ CURRENT CHAPTER:\n$CHAPTER_CONTENT\n\nProvide ONLY the additional content to be 
                 ADDITIONAL_TEXT="$CONT_RESULT"
             fi
 
-            # Clean up the content - remove meta-text, separators, notes, etc.
-            ADDITIONAL_TEXT=$(echo "$ADDITIONAL_TEXT" | 
-                # Remove leading/trailing whitespace
-                sed 's/^\s\+//;s/\s\+$//' |
-                # Remove markdown separators
-                sed 's/^---$//g' |
-                # Remove content continuation markers
-                sed 's/^Here is the continuation:$//gi' |
-                sed 's/^Here is the additional content:$//gi' |
-                sed 's/^Content to be appended:$//gi' |
-                sed 's/^Additional text:$//gi' |
-                # Remove any lines that look like notes or instructions
-                sed '/^Note:/d' |
-                sed '/^This content could be appended/d' |
-                sed '/^I will now continue/d'
-            )
+            # Clean up the content by first trimming whitespace
+            ADDITIONAL_TEXT=$(echo "$ADDITIONAL_TEXT" | sed 's/^\s\+//;s/\s\+$//')
+            
+            # Then use our reusable function to clean up all the meta-text
+            ADDITIONAL_TEXT=$(clean_llm_output "$ADDITIONAL_TEXT")
 
             if [ -n "$ADDITIONAL_TEXT" ]; then
                 # Check if the additional text starts with heading markup
@@ -2287,7 +2409,9 @@ Please focus on:
     
     if [ -n "$LAST_CHAPTER_NUM" ] && [ "$CHAPTER_NUM" != "$LAST_CHAPTER_NUM" ]; then
         echo "⏳ Waiting between chapters to avoid API rate limits..."
-        show_wait_animation "$DELAY_BETWEEN_CHAPTERS" "Chapter cooldown"
+        show_wait_animation "Chapter cooldown"
+        sleep "$DELAY_BETWEEN_CHAPTERS"
+        stop_wait_animation
     fi
 done
 
