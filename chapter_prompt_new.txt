@@ -1,0 +1,43 @@
+CHAPTER_USER_PROMPT="Write Chapter ${CHAPTER_NUM}: '${CHAPTER_TITLE}' 
+
+CONTEXT:
+- Book Outline: ${OUTLINE_CONTENT}
+- Existing Chapters: ${EXISTING_CHAPTERS}
+
+CRITICAL LENGTH REQUIREMENT:
+- MUST be ${MIN_WORDS}-${MAX_WORDS} words (STRICT REQUIREMENT: GENERATE AT LEAST ${MIN_WORDS} WORDS)
+- Your response will be measured for word count and rejected if too short
+- Plan for approximately 5-6 substantive sections with detailed content in each
+
+CONTENT REQUIREMENTS:
+- Style: ${WRITING_STYLE} | Tone: ${TONE}
+${STYLE_INSTRUCTIONS}
+${TONE_INSTRUCTIONS}
+- Content must be original (no plagiarism, no copyrighted text)
+- Include concrete examples, case studies, or anecdotes for each key point
+- Develop ideas fully with supporting evidence and explanation
+- Include practical, actionable advice that readers can implement
+
+FORMAT REQUIREMENTS:
+- Return ONLY the final narrative (no meta text, no notes, no placeholders)
+- DO NOT start with 'Chapter ${CHAPTER_NUM}' or similar — content only
+- Never say 'Conclusion'; use creative endings or seamless transitions
+- Use markdown formatting for titles/headings (## for section headers)
+- Bold text (**text**) should be used sparingly and strategically
+
+DETAILED STRUCTURE (minimum 2000 words total):
+1. Strong opening hook (200-250 words) that introduces the chapter theme
+2. Main concept introduction (300-350 words) that explains core ideas
+3. First key point section (300-350 words) with examples and practical applications
+4. Second key point section (300-350 words) with different perspective or approach
+5. Third key point section (300-350 words) building on previous sections
+6. Fourth key point section (300-350 words) addressing common challenges/questions
+7. Integration section (250-300 words) showing how concepts work together
+8. Reflective closing (200-250 words) that transitions to the next chapter
+
+WRITING APPROACH:
+- Use vivid, descriptive language throughout
+- Vary sentence length and structure for engaging reading
+- Include rhetorical questions to engage reader thinking
+- Create narrative flow where each section builds on previous sections
+- Aim for depth over breadth - fully develop fewer ideas rather than briefly mentioning many"

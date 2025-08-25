@@ -157,7 +157,7 @@ configure_settings() {
     echo "   API Key: ${GEMINI_API_KEY:+Set}${GEMINI_API_KEY:-Not Set}"
     echo "   Model: ${BOOK_MODEL:-gemini-1.5-flash-latest}"
     echo "   Temperature: ${BOOK_TEMPERATURE:-0.8}"
-    echo "   Words per chapter: ${BOOK_MIN_WORDS:-1500}-${BOOK_MAX_WORDS:-2000}"
+    echo "   Words per chapter: ${BOOK_MIN_WORDS:-1000}-${BOOK_MAX_WORDS:-2000}"
     echo "   Style: ${BOOK_STYLE:-detailed}"
     echo "   Tone: ${BOOK_TONE:-professional}"
     echo ""
@@ -197,7 +197,7 @@ This tool generates complete 30,000-word books using AI, formatted for KDP publi
 
 WORKFLOW:
 1. Creates detailed book outline (12-15 chapters)
-2. Generates each chapter (2,000-2,500 words)
+2. Generates each chapter (2,000-3,000 words)
 3. Reviews and edits content for quality
 4. Compiles everything into publication-ready manuscript
 
@@ -845,7 +845,7 @@ edit_chapter() {
 - Strengthening character development and dialogue
 - Adding more vivid descriptions where appropriate
 - Maintaining the original story and voice
-- Ensuring 1500-2000 word length
+- Ensuring 1000-2000 word length
 
 Rewrite the chapter with these improvements:
 

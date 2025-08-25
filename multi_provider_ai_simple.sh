@@ -165,14 +165,22 @@ function smart_api_call() {
     local fallback_models=("llama3:8b" "llama3.2:1b" "llama3:latest" "gemma:7b" "tinyllama:latest" "mixtral:latest" "llama2:latest")
     
     # If model is specified, use it first, otherwise try default models
-    if [ -n "$model" ]; then
-        echo "🤖 Using specified model: $model" >&2
-        # call_ollama_api expects: prompt, system_prompt, task_type, temperature, max_tokens, model_name
-        if call_ollama_api "$prompt" "$system_prompt" "$task_type" "$temperature" "$max_tokens" "$max_retries" "$model"; then
+    # if [ -n "$model" ]; then
+    #     echo "🤖 Using specified model: $model" >&2
+    #     # call_ollama_api expects: prompt, system_prompt, task_type, temperature, max_tokens, model_name
+    #     if call_ollama_api "$prompt" "$system_prompt" "$task_type" "$temperature" "$max_tokens" "$max_retries" "$model"; then
+    #         success=true
+    #     fi
+    # fi
+
+    if [ -n "$GEMINI_API_KEY" ]; then
+        echo "🔄 Trying Gemini API (attempt $current_attempt/$max_retries)" >&2
+        if call_gemini_api "$prompt" "$system_prompt" "$temperature" "$max_tokens"; then
             success=true
         fi
+        sleep 1
     fi
-    
+
     # Ensure values are numeric for comparison
     if ! [[ "$current_attempt" =~ ^[0-9]+$ ]]; then
         echo "⚠️ Invalid current_attempt value: $current_attempt, setting to 1" >&2
@@ -185,15 +193,6 @@ function smart_api_call() {
     fi
     
     while [ "$success" = false ] && [ $current_attempt -le $max_retries ]; do
-        # Try each fallback model in turn
-        for fallback_model in "${fallback_models[@]}"; do
-            echo "🔄 Trying fallback model: $fallback_model (attempt $current_attempt/$max_retries)" >&2
-            if call_ollama_api "$prompt" "$system_prompt" "$task_type" "$temperature" "$max_tokens" "$max_retries" "$fallback_model"; then
-                success=true
-                break
-            fi
-            sleep 1
-        done
         
         # If still not successful, try Gemini
         if [ "$success" = false ] && [ -n "$GEMINI_API_KEY" ]; then
@@ -204,7 +203,19 @@ function smart_api_call() {
             fi
             sleep 1
         fi
-        
+
+        if [ "$success" = false ] && [ "${#fallback_models[@]}" -gt 0 ]; then
+            # Try each fallback model in turn
+            for fallback_model in "${fallback_models[@]}"; do
+                echo "🔄 Trying fallback model: $fallback_model (attempt $current_attempt/$max_retries)" >&2
+                if call_ollama_api "$prompt" "$system_prompt" "$task_type" "$temperature" "$max_tokens" "$max_retries" "$fallback_model"; then
+                    success=true
+                    break
+                fi
+                sleep 1
+            done
+        fi
+
         # If still not successful, try Groq
         if [ "$success" = false ] && [ -n "$GROQ_API_KEY" ]; then
             echo "🔄 Trying Groq API (attempt $current_attempt/$max_retries)" >&2
@@ -281,6 +292,10 @@ call_gemini_api() {
     local system_prompt="$2"
     local temperature="$3"
     local max_tokens="$4"
+
+    API_KEY="${GEMINI_API_KEY}"
+    local top_k=40
+    local top_p=0.9
     
     # Try each model until one works or we've tried them all
     local total_models=${#GEMINI_MODELS[@]}
@@ -311,30 +326,38 @@ call_gemini_api() {
             fi
             continue
         fi
-        
-        rainbow_text "🔄 Trying Gemini model: $model_name"
+
+        echo "Max Tokens: $max_tokens" >&2
+        echo "➡️ Trying Gemini model: $model_name" >&2
         local url="https://generativelanguage.googleapis.com/v1beta/models/${model_name}:generateContent"
+        echo "📡 Sending request to: $url" >&2
         local full_prompt="$system_prompt\n\n$prompt"
         
         local payload=$(jq -n \
-            --arg prompt "$full_prompt" \
-            --arg temp "$temperature" \
-            --arg max "$max_tokens" \
+            --arg prompt "$prompt" \
+            --argjson temp "$temperature" \
+            --argjson maxtokens "$max_tokens" \
+            --argjson topk "$top_k" \
+            --argjson topp "$top_p" \
             '{
                 "contents": [{
+                    "role": "user",
                     "parts": [{"text": $prompt}]
                 }],
                 "generationConfig": {
                     "temperature": ($temp | tonumber),
-                    "maxOutputTokens": ($max | tonumber)
+                    "maxOutputTokens": ($maxtokens | tonumber),
+                    "topK": ($topk | tonumber),
+                    "topP": ($topp | tonumber)
                 }
             }')
 
-    echo -e "🤖 Generating response with Ollama..." >&2
-    
+    echo -e "🤖 Generating response with Gemini..." >&2
+
     # Make the API call
-    local response=$(curl -s --max-time 120 \
+    local response=$(curl -s -X POST --max-time 120 \
         -H "Content-Type: application/json" \
+        -H "x-goog-api-key: $API_KEY" \
         -d "$payload" \
         "$url")
     local curl_exit_code=$?
@@ -522,7 +545,7 @@ call_ollama_api() {
             max_tokens=4096
         fi
     fi
-    
+
     # Write message directly without using grep in pipe
     echo -e "🖥️  Using local Ollama model: $model with temperature $temperature" >&2
     echo "DEBUG: Using model: $model_name, temperature: $temperature, max_tokens: $max_tokens, ctx: $ctx_window" >> "$LOG_FILE"
@@ -635,7 +658,7 @@ generate_outline_with_smart_api() {
     
     local system_prompt="You are an expert book author and publishing professional tasked with creating high-quality, commercially viable books for publication on KDP and other platforms. Your goal is to produce engaging, well-structured, and professionally written content that readers will find valuable and enjoyable.
 
-Create detailed book outlines that will guide the generation of 20,000-25,000 word books with 12-15 chapters of 1,500-2,000 words each.
+Create detailed book outlines that will guide the generation of 20,000-25,000 word books with 12-15 chapters of 2,500-3,000 words each.
 
 When creating outlines, always format chapter titles clearly as:
 Chapter 1: [Title]
@@ -897,7 +920,7 @@ test_all_providers() {
 
 estimate_book_cost() {
     local num_chapters="${1:-12}"
-    local words_per_chapter="${2:-2500}"
+    local words_per_chapter="${2:-1000}"
     
     echo "💰 Estimated Book Generation Cost:"
     echo "   Chapters: $num_chapters"
@@ -925,7 +948,7 @@ main() {
             show_provider_status
             ;;
         "estimate")
-            estimate_book_cost "${2:-12}" "${3:-2500}"
+            estimate_book_cost "${2:-12}" "${3:-1000}"
             ;;
         *)
             echo "Multi-Provider AI System for Book Generation"

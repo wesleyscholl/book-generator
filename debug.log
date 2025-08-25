@@ -1,17 +1,15 @@
-Debug: USER_PROMPT for outline generation:
-Create a detailed outline for a Technical book on 'The Test Book' targeting Test Readers.
+Debug: OUTLINE_CONTENT before review step:
+# Conquering Chronic Pain
+## A Holistic Approach to Self-Management
 
-REQUIRED ELEMENTS:
-1. A compelling book title and subtitle.
-2. 14-20 chapters, each with:
-   - Specific, value-driven titles.
-   - 2-3 sentence summaries of chapter content.
-3. Character profiles (fiction) OR key concept definitions (non-fiction).
-4. 3-5 core themes to reinforce throughout the book.
-5. Target reading level and tone guidance.
-6. Suggested word count distribution across chapters.
+SUMMARY:
+This book offers a comprehensive guide for individuals suffering from chronic pain, focusing on non-pharmaceutical, self-management strategies. It empowers readers to understand the multifaceted nature of pain and provides actionable holistic tools to reduce discomfort, improve functionality, and enhance overall quality of life. Through practical techniques, it aims to shift the narrative from being a victim of pain to becoming an active participant in one's healing journey.
 
-FORMAT RULES:
-- Use the exact chapter format: Chapter 1: [Title]
-- Do NOT include markdown, extra formatting, or commentary.
-- Output should be a clean, final outline only.
+THEMES:
+1.  **Empowerment & Agency:** Shifting control from external factors to internal self-management capabilities.
+2.  **Mind-Body Connection:** Understanding and leveraging the profound interplay between psychological, emotional, and physical states in pain experience.
+3.  **Holistic Integration:** Combining diverse non-pharmacological strategies (physical, mental, emotional, lifestyle) for comprehensive pain relief and well-being.
+DEBUG: Skipping final draft step
+DEBUG: Copying original outline to final draft file: ./book_outputs/conquering-chronic-pain-20250825_115849/book_outline_final.md
+DEBUG: File copy operation returned: 0
+DEBUG: Original outline copied successfully to final draft

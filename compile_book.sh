@@ -114,9 +114,10 @@ FAST=false
 COVER_IMAGE=""
 BACK_COVER=""
 ISBN=""
-PUBLISHER="Self-Published"
+PUBLISHER="Speedy Quick Publishing"
 PUBLICATION_YEAR=$(date +"%Y")
 GENERATE_COVER=false
+ATTACH_COVER=false
 
 # Function to generate book metadata
 generate_metadata() {
@@ -135,10 +136,10 @@ generate_metadata() {
 title: "$title"
 author: "$AUTHOR"
 date: "$PUBLICATION_YEAR"
-titlepage: false
 rights: "Copyright © $PUBLICATION_YEAR $AUTHOR. All rights reserved."
 language: "en-US"
 publisher: "$PUBLISHER"
+title: false
 identifier:
   - scheme: ISBN
     text: "${ISBN:-[No ISBN Provided]}"
@@ -164,29 +165,29 @@ generate_author_pen_name() {
     # Use a predefined list of creative pen names
     local pen_names=(
         "Elara Morgan"
-        "J.T. Blackwood"
-        "Sophia Wyndham"
-        "Xavier Stone"
-        "Leo Hawthorne"
-        "Isabella Quinn"
-        "Nathaniel Grey"
-        "Olivia Sterling"
-        "Liam West"
-        "Mia Rivers"
-        "Noah Bennett"
-        "Ava Sinclair"
-        "Oliver James"
-        "Charlotte Wells"
-        "Jameson Blake"
-        "Luna Rivers"
-        "Ethan Cross"
-        "Zoe Hart"
-        "Mason Brooks"
-        "Amelia Rivers"
-        "Aiden Chase"
-        "Jasper Knight"
-        "Cassandra Vale"
-        "Dahlia Black"
+        # "J.T. Blackwood"
+        # "Sophia Wyndham"
+        # "Xavier Stone"
+        # "Leo Hawthorne"
+        # "Isabella Quinn"
+        # "Nathaniel Grey"
+        # "Olivia Sterling"
+        # "Liam West"
+        # "Mia Rivers"
+        # "Noah Bennett"
+        # "Ava Sinclair"
+        # "Oliver James"
+        # "Charlotte Wells"
+        # "Jameson Blake"
+        # "Luna Rivers"
+        # "Ethan Cross"
+        # "Zoe Hart"
+        # "Mason Brooks"
+        # "Amelia Rivers"
+        # "Aiden Chase"
+        # "Jasper Knight"
+        # "Cassandra Vale"
+        # "Dahlia Black"
     )
     
     # Select a random pen name from the list
@@ -410,6 +411,139 @@ generate_book_cover() {
     return 0
 }
 
+# Generate multiple book covers via OpenAI Images API and allow selection
+generate_book_covers() {
+    local BOOK_TITLE="$1"
+    local AUTHOR="$2"
+    local DESCRIPTION="$3"
+    local NUM_IMAGES="${4:-3}"
+    local OUTPUT_DIR="${5:-.}"
+
+    if [ -z "$OPENAI_API_KEY" ]; then
+        echo "⚠️ OPENAI_API_KEY not set; cannot generate AI covers."
+        return 1
+    fi
+
+    if ! command -v jq >/dev/null 2>&1; then
+        echo "⚠️ jq is required to parse the image API response. Install jq or set GENERATE_COVER=false to use ImageMagick fallback."
+        return 1
+    fi
+
+    mkdir -p "$OUTPUT_DIR"
+    local PROMPT
+    PROMPT="Generate a high-quality minimalist book cover in flat/vector style for a book titled '$BOOK_TITLE' by $AUTHOR. The cover should feature a central icon or image that represents the book's theme: $DESCRIPTION. Use solid colors, clean lines, and a minimalist aesthetic. Place the title '$BOOK_TITLE' centered above the main image in a large sans-serif font and the author '$AUTHOR' centered below in a smaller font."
+
+    echo "🎨 Requesting $NUM_IMAGES cover image(s) from the image API..."
+
+    # Build JSON request body safely using jq to avoid shell quoting issues
+    REQUEST_BODY=$(jq -nc --arg prompt "$PROMPT" --arg size "1024x1024" --argjson n "$NUM_IMAGES" '
+        {prompt: $prompt, n: $n, size: $size}
+    ')
+
+    RESPONSE=$(curl -s https://api.openai.com/v1/images/generations \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer $OPENAI_API_KEY" \
+        -d "$REQUEST_BODY")
+
+    echo "$RESPONSE"
+
+    if [ -z "$RESPONSE" ]; then
+        echo "⚠️ No response from image API"
+        return 1
+    fi
+
+    # Save images
+    local saved=()
+    for i in $(seq 0 $((NUM_IMAGES-1))); do
+        IMAGE_B64=$(echo "$RESPONSE" | jq -r ".data[$i].b64_json" 2>/dev/null)
+        if [ -z "$IMAGE_B64" ] || [ "$IMAGE_B64" = "null" ]; then
+            echo "⚠️ Image $((i+1)) missing from response"
+            continue
+        fi
+        SAFE_TITLE=$(echo "$BOOK_TITLE" | tr ' /' '_' | tr -cd '[:alnum:]_-')
+        IMAGE_FILE="$OUTPUT_DIR/${SAFE_TITLE}_cover_$((i+1)).png"
+        echo "$IMAGE_B64" | base64 --decode > "$IMAGE_FILE"
+        saved+=("$IMAGE_FILE")
+        echo "✅ Saved cover $((i+1)): $IMAGE_FILE"
+    done
+
+    if [ ${#saved[@]} -eq 0 ]; then
+        echo "⚠️ No covers saved"
+        return 1
+    fi
+
+    # If running in non-interactive mode, pick the first image
+    if [ ! -t 0 ]; then
+        CHOICE=1
+        echo "Non-interactive shell detected; selecting first generated cover: ${saved[0]}"
+    else
+        echo "Available covers:"
+        local idx=1
+        for f in "${saved[@]}"; do
+            echo "  $idx) $(basename "$f")"
+            idx=$((idx+1))
+        done
+        echo "Enter the number of the cover to use (1-${#saved[@]}). Press ENTER to choose 1:";
+        read -r CHOICE
+        if ! [[ "$CHOICE" =~ ^[0-9]+$ ]] || [ "$CHOICE" -lt 1 ] || [ "$CHOICE" -gt ${#saved[@]} ]; then
+            CHOICE=1
+        fi
+    fi
+
+    CHOSEN_FILE="${saved[$((CHOICE-1))]}"
+    echo "🎯 Selected cover: $CHOSEN_FILE"
+
+    # Export chosen cover path to the caller via COVER_IMAGE var
+    COVER_IMAGE="$CHOSEN_FILE"
+    return 0
+}
+
+# Attach an existing image file as the book cover (validate and optionally resize)
+attach_existing_cover() {
+    local provided_path="$1"
+    local output_dir="$2"
+
+    if [ -z "$provided_path" ]; then
+        echo "⚠️ No cover path provided to attach_existing_cover"
+        return 1
+    fi
+
+    if [ ! -f "$provided_path" ]; then
+        echo "❌ Provided cover image not found: $provided_path"
+        return 1
+    fi
+
+    # Ensure ImageMagick exists for optional resizing
+    local img_cmd="convert"
+    if command -v magick &> /dev/null; then
+        img_cmd="magick"
+    fi
+
+    mkdir -p "$output_dir"
+    local safe_basename="$(basename "$provided_path")"
+    local dest="$output_dir/$safe_basename"
+
+    # Copy first, then optionally resize if smaller than required
+    cp -f "$provided_path" "$dest" 2>/dev/null || { echo "❌ Failed to copy cover image"; return 1; }
+
+    # Check dimensions and resize only if smaller than 1024x1536
+    if command -v identify &> /dev/null; then
+        dims=$(identify -format "%wx%h" "$dest" 2>/dev/null || true)
+        if [ -n "$dims" ]; then
+            width=${dims%x*}
+            height=${dims#*x}
+            if [ "$width" -lt 1024 ] || [ "$height" -lt 1536 ]; then
+                echo "⚠️ Cover image smaller than recommended 1024x1536 — resizing with ImageMagick upscale (may reduce quality)"
+                $img_cmd "$dest" -resize 1024x1536\! "$dest" 2>/dev/null || true
+            fi
+        fi
+    fi
+
+    COVER_IMAGE="$dest"
+    echo "✅ Attached existing cover: $(basename "$COVER_IMAGE")"
+    return 0
+}
+
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -436,6 +570,12 @@ while [[ $# -gt 0 ]]; do
         --generate-cover)
             GENERATE_COVER=true
             shift
+            ;;
+        --add-cover)
+            # Accept a path to an existing image and mark it to be attached as the cover
+            COVER_IMAGE="$2"
+            ATTACH_COVER=true
+            shift 2
             ;;
         --fast)
             # Fast mode: skip slow mobi/azw3 conversions and some post-processing
@@ -653,15 +793,13 @@ done
 # -----------------------------
 # Extract book title
 # -----------------------------
-BOOK_TITLE=$(grep -i -m1 -E "(^#[^#]|title)" "$OUTLINE_FILE" \
-    | sed 's/^#*\s*//;s/^[Tt]itle:\s*//;s/[Bb]ook [Tt]itle://;s/^ *//;s/ *$//;s/:.*//;' \
-    | head -1)
+BOOK_TITLE=$(head -n 1 "$OUTLINE_FILE" | sed 's/^# //; s/^BOOK TITLE:[[:space:]]*//' | tr -d '\r')
 
 if [ -z "$BOOK_TITLE" ]; then
     BOOK_TITLE="Generated Book $(date +%Y-%m-%d)"
 fi
-# Keep any 'Book Title:' prefix as requested; extract subtitle for layout
-SUB_TITLE="$(grep -i -m1 -E "(^#[^#]|title)" "$OUTLINE_FILE" | sed 's/^#*\s*//;s/^[Tt]itle:\s*//;s/[Bb]ook [Tt]itle://;s/^ *//;s/ *$//;' | cut -d ':' -f 2- | head -1)"
+# Extract subtitle for layout
+SUB_TITLE=$(head -n 2 "$OUTLINE_FILE" | tail -n 1 | sed 's/^## //; s/^SUBTITLE:[[:space:]]*//' | tr -d '\r')
 
 # Create manuscript
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
@@ -689,8 +827,36 @@ fi
 if [ -n "$COVER_IMAGE" ] && [ -f "$COVER_IMAGE" ]; then
     echo "🖼️ Using provided cover: $COVER_IMAGE"
     cp "$COVER_IMAGE" "$EXPORTS_DIR/$(basename "$COVER_IMAGE")"
+    COVER_IMAGE="$EXPORTS_DIR/$(basename "$COVER_IMAGE")"
+elif [ "$ATTACH_COVER" = true ]; then
+    # Attempt to attach the provided cover image (path was set during args parsing)
+    attach_existing_cover "$COVER_IMAGE" "$EXPORTS_DIR" || true
+    if [ -n "$COVER_IMAGE" ] && [ -f "$COVER_IMAGE" ]; then
+        # If attach_existing_cover set COVER_IMAGE to exports path, ensure it is used
+        if [ "$COVER_IMAGE" != "$EXPORTS_DIR/$(basename "$COVER_IMAGE")" ]; then
+            # ensure it's copied into exports dir
+            cp -f "$COVER_IMAGE" "$EXPORTS_DIR/" 2>/dev/null || true
+            COVER_IMAGE="$EXPORTS_DIR/$(basename "$COVER_IMAGE")"
+        fi
+    fi
 elif [ "$GENERATE_COVER" = true ]; then
-    generate_book_cover "$BOOK_TITLE" "$EXPORTS_DIR"
+    # Prefer AI-generated multiple covers if OpenAI key and jq are available
+    if [ -n "$OPENAI_API_KEY" ] && command -v jq >/dev/null 2>&1; then
+        # DESCRIPTION: use SUMMARY or a short excerpt as prompt description if available
+        DESC="${SUMMARY:-$BOOK_TITLE}"
+        generate_book_covers "$BOOK_TITLE" "$AUTHOR" "$DESC" 3 "$EXPORTS_DIR"
+        # generate_book_covers sets COVER_IMAGE to the chosen file path on success
+        if [ -n "$COVER_IMAGE" ] && [ -f "$COVER_IMAGE" ]; then
+            echo "🖼️ Using selected AI cover: $COVER_IMAGE"
+            cp "$COVER_IMAGE" "$EXPORTS_DIR/$(basename "$COVER_IMAGE")"
+            COVER_IMAGE="$EXPORTS_DIR/$(basename "$COVER_IMAGE")"
+        else
+            echo "⚠️ AI cover selection failed or was skipped; falling back to ImageMagick cover generation"
+            generate_book_cover "$BOOK_TITLE" "$EXPORTS_DIR"
+        fi
+    else
+        generate_book_cover "$BOOK_TITLE" "$EXPORTS_DIR"
+    fi
 fi
 
 # Ensure cover image is properly set up before creating metadata
@@ -726,32 +892,40 @@ header-includes:
 \newpage
 \thispagestyle{empty}
 \clearpage\vspace*{\fill}
+
 # $BOOK_TITLE {.unnumbered .unlisted}
-## $SUB_TITLE
+## $SUB_TITLE {.unnumbered .unlisted}
 \vspace{12em}
 
-## By $AUTHOR
-## © $PUBLICATION_YEAR
+### By $AUTHOR {.unnumbered .unlisted}
+### © $PUBLICATION_YEAR {.unnumbered .unlisted}
 
-
-$(if [ -f "$EXPORTS_DIR/$LOGO_BASENAME" ]; then echo "## ![]($LOGO_BASENAME){ width=40% } "; fi)
+\centering
+$(if [ -f "$EXPORTS_DIR/$LOGO_BASENAME" ]; then echo "![]($LOGO_BASENAME){ width=40% } "; fi)
+\raggedright
+\flushleft
 \vspace*{\fill}\clearpage
 
 \newpage
 
 \clearpage\vspace*{\fill}
-$(if [ -f "$EXPORTS_DIR/$LOGO_BASENAME" ]; then echo "## ![]($LOGO_BASENAME){ width=75% } "; fi)
+\centering
+$(if [ -f "$EXPORTS_DIR/$LOGO_BASENAME" ]; then echo "![]($LOGO_BASENAME){ width=75% } "; fi)
+\raggedright
+\flushleft
 
-\centerline{\textbf{Copyright © $PUBLICATION_YEAR $AUTHOR}}
-\centerline{\textbf{$PUBLISHER}}
 $(if [ -n "$ISBN" ]; then echo "ISBN: $ISBN"; fi)
 All rights reserved. No part of this publication may be reproduced, distributed, or transmitted in any form or by any means, including photocopying, recording, or other electronic or mechanical methods, without the prior written permission of the publisher.
+\centerline{\textnormal{Copyright © $PUBLICATION_YEAR $AUTHOR}}
+\centerline{\textnormal{$PUBLISHER}}
 
 \newpage
 
 \clearpage
-\setcounter{tocdepth}{1}
+
+\setcounter{tocdepth}{2}
 \tableofcontents
+
 \clearpage
 
 \newpage
@@ -762,6 +936,34 @@ EOF
 echo ""
 echo "📖 Assembling chapters into manuscript..."
 echo ""
+
+# If a front cover image exists, insert it immediately after the YAML front-matter
+# (after the second '---') so header-includes remain in the preamble and PDF builds correctly.
+if [ -n "$COVER_IMAGE" ] && [ -f "$COVER_IMAGE" ]; then
+    echo "🖼️ Embedding front cover into manuscript (after YAML front-matter): $(basename "$COVER_IMAGE")"
+    TMP_MANUSCRIPT="$(mktemp)"
+    COVER_BASENAME="$(basename "$COVER_IMAGE")"
+
+    # Insert the cover after the second '---' which closes the YAML metadata block
+    awk -v coverfile="$COVER_BASENAME" '
+    BEGIN { count=0; inserted=0 }
+    {
+        print $0
+        if ($0 == "---") {
+            count++
+            if (count == 2 && !inserted) {
+                # Insert cover markup and a page break
+                print "\\thispagestyle{empty}"
+                print "![](" coverfile "){ width=100% }"
+                print "\\clearpage"
+                inserted=1
+            }
+        }
+    }
+    ' "$MANUSCRIPT_FILE" > "$TMP_MANUSCRIPT"
+
+    mv "$TMP_MANUSCRIPT" "$MANUSCRIPT_FILE"
+fi
 
 TOTAL_WORDS=0
 CHAPTER_COUNTER=0
@@ -783,9 +985,20 @@ for CHAPTER_FILE in "${CHAPTER_FILES[@]}"; do
     echo "" >> "$MANUSCRIPT_FILE"
 
     # Look up chapter display title from the outline to avoid duplicated titles
-    outline_line=$(grep -i -m1 -E "Chapter[[:space:]]+${CHAPTER_NUM}[:\. -]*.*" "$OUTLINE_FILE" || true)
+    # First try markdown format (### Chapter N: Title)
+    outline_line=$(grep -i -m1 -E "^###[[:space:]]+Chapter[[:space:]]+${CHAPTER_NUM}[:\. ]" "$OUTLINE_FILE" || true)
+    
+    # If not found, try older formats
+    if [ -z "$outline_line" ]; then
+        outline_line=$(grep -i -m1 -E "Chapter[[:space:]]+${CHAPTER_NUM}[:\. -]*.*" "$OUTLINE_FILE" || true)
+    fi
+    
     if [ -n "$outline_line" ]; then
-        DISPLAY_TITLE=$(echo "$outline_line" | sed -E 's/^[[:space:]]*[Cc]hapter[[:space:]]+'${CHAPTER_NUM}'[:\. -]*//; s/^[[:space:]]*'${CHAPTER_NUM}'[\.)[:space:]-]*//')
+        # First remove markdown prefix if present
+        DISPLAY_TITLE=$(echo "$outline_line" | sed 's/^###[[:space:]]*//')
+        
+        # Then clean up the title
+        DISPLAY_TITLE=$(echo "$DISPLAY_TITLE" | sed -E 's/^[[:space:]]*[Cc]hapter[[:space:]]+'${CHAPTER_NUM}'[:\. -]*//; s/^[[:space:]]*'${CHAPTER_NUM}'[\.)[:space:]-]*//')
         DISPLAY_TITLE=$(echo "$DISPLAY_TITLE" | sed -E 's/^[[:space:]]*[Cc]hapter[[:space:]]*[0-9]+[:\. -]*//i; s/^[[:space:]]*[0-9]+[\.)[:space:]-]*//')
         DISPLAY_TITLE=$(echo "$DISPLAY_TITLE" | sed 's/^ *//; s/ *$//')
         [ -z "$DISPLAY_TITLE" ] && DISPLAY_TITLE="Chapter ${CHAPTER_NUM}"
@@ -794,20 +1007,27 @@ for CHAPTER_FILE in "${CHAPTER_FILES[@]}"; do
     fi
     CLEAN_CHAPTER_TITLE=$(echo "$DISPLAY_TITLE" | sed -e "s/^Chapter $CHAPTER_NUM: //; s/^Chapter $CHAPTER_NUM //")
 
-    # Split chapter title at first colon to create H1/H2 structure
+    # Split chapter title at first colon to create H1/H2/H3 structure
     if [[ "$CLEAN_CHAPTER_TITLE" == *":"* ]]; then
-        # Extract part before first colon for H1
+        # Extract part before first colon for the main chapter title and part after for subtitle
         CHAPTER_MAIN_TITLE=$(echo "$CLEAN_CHAPTER_TITLE" | cut -d: -f1 | sed 's/^ *//; s/ *$//')
-        # Extract part after first colon for H2
         CHAPTER_SUBTITLE=$(echo "$CLEAN_CHAPTER_TITLE" | cut -d: -f2- | sed 's/^ *//; s/ *$//')
-        
-        # Write split title structure to manuscript
-        echo "# Chapter $CHAPTER_NUM: $CHAPTER_MAIN_TITLE {.chapter-title}" >> "$MANUSCRIPT_FILE"
+
+        # H1: chapter anchor/title (keeps numbering for TOC)
+        echo "# Chapter $CHAPTER_NUM {.unnumbered}" >> "$MANUSCRIPT_FILE"
         echo "" >> "$MANUSCRIPT_FILE"
-        echo "## $CHAPTER_SUBTITLE" >> "$MANUSCRIPT_FILE"
+        # H2: actual chapter title
+        echo "## $CHAPTER_MAIN_TITLE {.chapter-main-title}" >> "$MANUSCRIPT_FILE"
+        # H3: subtitle (optional)
+        if [ -n "$CHAPTER_SUBTITLE" ]; then
+            echo "" >> "$MANUSCRIPT_FILE"
+            echo "### $CHAPTER_SUBTITLE {.chapter-subtitle}" >> "$MANUSCRIPT_FILE"
+        fi
     else
-        # No colon found, use original format
-        echo "# Chapter $CHAPTER_NUM: $CLEAN_CHAPTER_TITLE {.chapter-title}" >> "$MANUSCRIPT_FILE"
+        # No colon found: H1 = Chapter N, H2 = full chapter title
+        echo "# Chapter $CHAPTER_NUM {.chapter-title .unnumbered .unlisted}" >> "$MANUSCRIPT_FILE"
+        echo "" >> "$MANUSCRIPT_FILE"
+        echo "## $CLEAN_CHAPTER_TITLE {.chapter-main-title}" >> "$MANUSCRIPT_FILE"
     fi
     echo "" >> "$MANUSCRIPT_FILE"
 
@@ -815,73 +1035,73 @@ for CHAPTER_FILE in "${CHAPTER_FILES[@]}"; do
     CHAPTER_CONTENT=$(cat "$CHAPTER_FILE")
     
     # First pass: Remove all metadata sections with comprehensive pattern matching
-    CLEAN_CONTENT=$(echo "$CHAPTER_CONTENT" | sed -E -i '
-        # Remove standard metadata sections (case insensitive)
-        /(?i)^(PLAGIARISM|COPYRIGHT)[ _\/]*ANALYSIS:?/,/^$/d;
-        /(?i)^(COPYRIGHT|PLAGIARISM)[ _\/]*RISK:?/,/^$/d;
-        /(?i)^FLAGGED[ _]*SECTIONS:?/,/^$/d;
-        /(?i)^(ISSUES|PROBLEMS)[ _]*FOUND:?/,/^$/d;
-        /(?i)^WRITING[ _]*GUIDELINES:?/,/^$/d;
-        /(?i)^DETAILED[ _]*ANALYSIS:?/,/^$/d;
-        /(?i)^RECOMMENDATIONS?:?/,/^$/d;
-        /(?i)^IMPORTANT[ _]*WORD[ _]*COUNT[ _]*REQUIREMENT:?/,/^$/d;
-        /(?i)^REWRITING[ _]*REQUIREMENTS?:?/,/^$/d;
-        /(?i)^The final answer is:/,/^$/d;
-        /(?i)^\**The content needs to be rewritten/,/^$/d;
-        
-        # Remove all variations of markdown-formatted guidelines
-        /(?i)^\*\*WRITING[ _]*GUIDELINES:?\*\*/,/^$/d;
-        /(?i)^\*\*PLAGIARISM[ _\/]*ANALYSIS:?\*\*/,/^$/d;
-        /(?i)^\*\*COPYRIGHT[ _]*ANALYSIS:?\*\*/,/^$/d;
-        /(?i)^\*\*REWRITING[ _]*REQUIREMENTS:?\*\*/,/^$/d;
-        
-        # Remove score and risk indicators
-        /(?i)^ORIGINALITY[ _]*SCORE:?/d;
-        /(?i)^PLAGIARISM[ _]*RISK:?/d;
-        /(?i)^COPYRIGHT[ _]*RISK:?/d;
-        /(?i)^ISSUES[ _]*FOUND:?/d;
-        
-        # Remove chapter rewrite markers
-        /(?i)^Chapter Rewrite:?/d;
-        /(?i)^Please rewrite the entire chapter/d;
-        
-        # Remove specific phrases
-        s/Figure 1: Book Cover//g;
-        
-        # Remove note sections
-        /(?i)^NOTE TO WRITER:?/,/^$/d;
-        /(?i)^STYLE NOTES?:?/,/^$/d;
-        
-        # Remove AI-generated headers
-        /(?i)^AI[ _]*GENERATED[ _]*CONTENT:?/,/^$/d;
-        /(?i)^\*\*AI[ _]*GENERATED[ _]*CONTENT:?\*\*/,/^$/d;
-        /(?i)^Generated with AI/d;
-        /(?i)^This content was generated by/d;
-    ')
+    # macOS sed doesn't support (?i) case-insensitive flag, so we'll use grep for case-insensitive filtering
+    CLEAN_CONTENT=$(echo "$CHAPTER_CONTENT" | grep -v -i -E "^(PLAGIARISM|COPYRIGHT)[ _/]*ANALYSIS:?" | 
+        grep -v -i -E "^(COPYRIGHT|PLAGIARISM)[ _/]*RISK:?" | 
+        grep -v -i -E "^FLAGGED[ _]*SECTIONS:?" |
+        grep -v -i -E "^(ISSUES|PROBLEMS)[ _]*FOUND:?" |
+        grep -v -i -E "^WRITING[ _]*GUIDELINES:?" |
+        grep -v -i -E "^DETAILED[ _]*ANALYSIS:?" |
+        grep -v -i -E "^RECOMMENDATIONS?:?" |
+        grep -v -i -E "^IMPORTANT[ _]*WORD[ _]*COUNT[ _]*REQUIREMENT:?" |
+        grep -v -i -E "^REWRITING[ _]*REQUIREMENTS?:?" |
+        grep -v -i -E "^The final answer is:" |
+        grep -v -i -E "^\**The content needs to be rewritten" |
+        grep -v -i -E "^\*\*WRITING[ _]*GUIDELINES:?\*\*" |
+        grep -v -i -E "^\*\*PLAGIARISM[ _/]*ANALYSIS:?\*\*" |
+        grep -v -i -E "^\*\*COPYRIGHT[ _]*ANALYSIS:?\*\*" |
+        grep -v -i -E "^\*\*REWRITING[ _]*REQUIREMENTS:?\*\*" |
+        grep -v -i -E "^ORIGINALITY[ _]*SCORE:?" |
+        grep -v -i -E "^PLAGIARISM[ _]*RISK:?" |
+        grep -v -i -E "^COPYRIGHT[ _]*RISK:?" |
+        grep -v -i -E "^ISSUES[ _]*FOUND:?" |
+        grep -v -i -E "^Chapter Rewrite:?" |
+        grep -v -i -E "^Please rewrite the entire chapter" |
+        grep -v -i -E "^NOTE TO WRITER:?" |
+        grep -v -i -E "^STYLE NOTES?:?" |
+        grep -v -i -E "^AI[ _]*GENERATED[ _]*CONTENT:?" |
+        grep -v -i -E "^\*\*AI[ _]*GENERATED[ _]*CONTENT:?\*\*" |
+        grep -v -i -E "^Generated with AI" |
+        grep -v -i -E "^This content was generated by" |
+        sed 's/Figure 1: Book Cover//g'
+    )
 
     # Second pass: Remove trailing paragraphs that contain rewriting goals or prompt info
-    CLEAN_CONTENT=$(echo "$CLEAN_CONTENT" | sed -E '
-        # Remove common trailing metadata patterns
-        /(?i)^In this chapter(,| we)/,$d;
-        /(?i)^This chapter (meets|follows|adheres to)/,$d;
-        /(?i)^I have (written|created|completed)/,$d;
-        /(?i)^The chapter (now|has been|is) (complete|written)/,$d;
-        /(?i)^Note: This chapter/,$d;
-        /(?i)^Note to editor:/,$d;
-        /(?i)^Next steps:/,$d;
-        /(?i)^Next chapter:/,$d;
-        /(?i)^Word count:/,$d;
-        /(?i)^Chapter length:/,$d;
-        /(?i)^This draft (meets|satisfies|fulfills)/,$d;
-        /(?i)^As requested, this chapter/,$d;
-        /(?i)^END OF CHAPTER/,$d;
+    # Since this requires complex pattern matching that's difficult with grep, we'll use awk instead
+    CLEAN_CONTENT=$(echo "$CLEAN_CONTENT" | awk '
+        BEGIN { skip = 0; content = ""; }
+        tolower($0) ~ /^in this chapter(,| we)/ { skip = 1; next; }
+        tolower($0) ~ /^this chapter (meets|follows|adheres to)/ { skip = 1; next; }
+        tolower($0) ~ /^i have (written|created|completed)/ { skip = 1; next; }
+        tolower($0) ~ /^the chapter (now|has been|is) (complete|written)/ { skip = 1; next; }
+        tolower($0) ~ /^note: this chapter/ { skip = 1; next; }
+        tolower($0) ~ /^note to editor:/ { skip = 1; next; }
+        tolower($0) ~ /^next steps:/ { skip = 1; next; }
+        tolower($0) ~ /^next chapter:/ { skip = 1; next; }
+        tolower($0) ~ /^word count:/ { skip = 1; next; }
+        tolower($0) ~ /^chapter length:/ { skip = 1; next; }
+        tolower($0) ~ /^this draft (meets|satisfies|fulfills)/ { skip = 1; next; }
+        tolower($0) ~ /^as requested, this chapter/ { skip = 1; next; }
+        tolower($0) ~ /^end of chapter/ { skip = 1; next; }
+        !skip { print $0; }
     ')
     
-    # Remove first heading lines if they match common chapter title patterns to avoid duplicates
-    FORMATTED_CONTENT=$(echo "$CLEAN_CONTENT" | sed '1,3{/^# /d; /^\*\*/d; /^Chapter [0-9]/d;}' )
+    # Remove duplicate chapter titles, including the formats we've seen in the example
+    FORMATTED_CONTENT=$(echo "$CLEAN_CONTENT" | 
+        # First, remove headings in the first few lines
+        sed '1,5{/^# /d; /^\*\*/d; /^Chapter [0-9]/d;}' |
+        # Remove any line that contains the full chapter title
+        grep -v -F "$CLEAN_CHAPTER_TITLE" |
+        # Remove any line that contains "Chapter N:" followed by the title
+        grep -v -E "^Chapter ${CHAPTER_NUM}:.*${CLEAN_CHAPTER_TITLE}" |
+        # Remove lines with just the chapter number and title
+        grep -v -E "^Chapter ${CHAPTER_NUM}[[:space:]]+${CLEAN_CHAPTER_TITLE}"
+    )
 
     # Further formatting for subsections
-    FORMATTED_CONTENT=$(echo "$FORMATTED_CONTENT" | sed -E 's/^([*][*][^:]+:[*][*]) ([A-Z]) /\1\n\2 /g' | sed -E 's/^[*][*]([^:]+):[*][*]/## \1/g')
+    # Avoid converting bold (**text**) into headings (prevents unwanted TOC entries).
+    # Instead, remove bold markup while keeping the text inline.
+    FORMATTED_CONTENT=$(echo "$FORMATTED_CONTENT" | sed -E 's/\*\*([^*]+)\*\*/\1/g')
 
     # Append cleaned content
     echo "$FORMATTED_CONTENT" >> "$MANUSCRIPT_FILE"
@@ -921,8 +1141,16 @@ cat << EOF > "$METADATA_STATS_FILE"
 EOF
 
 # Add plagiarism checking summary if reports exist
-PLAGIARISM_REPORTS=($(ls "${BOOK_DIR}"/chapter_*_plagiarism_report.md 2>/dev/null))
-BACKUP_FILES=($(ls "${BOOK_DIR}"/chapter_*.md.backup_* 2>/dev/null))
+# Use find instead of ls with globbing which is safer
+PLAGIARISM_REPORTS=()
+while IFS= read -r -d '' file; do
+    PLAGIARISM_REPORTS+=("$file")
+done < <(find "${BOOK_DIR}" -name "chapter_*_plagiarism_report.md" -print0 2>/dev/null || true)
+# Similarly use find for backup files
+BACKUP_FILES=()
+while IFS= read -r -d '' file; do
+    BACKUP_FILES+=("$file")
+done < <(find "${BOOK_DIR}" -name "chapter_*.md.backup_*" -print0 2>/dev/null || true)
 
 if [ ${#PLAGIARISM_REPORTS[@]} -gt 0 ]; then
     echo "- **Plagiarism Checks Performed:** ${#PLAGIARISM_REPORTS[@]} chapters" >> "$METADATA_STATS_FILE"
@@ -990,11 +1218,12 @@ EOF
 # Add a simple end note to the manuscript instead
 cat << EOF >> "$MANUSCRIPT_FILE"
 \newpage
-\section{}
+\section{End}
 ---
-
-*Copyright © $PUBLICATION_YEAR $AUTHOR. All rights reserved.*
-*Published by $PUBLISHER*
+\begin{center}
+\textit{Copyright © $PUBLICATION_YEAR $AUTHOR. All rights reserved.}
+\textit{Published by $PUBLISHER}
+\end{center}
 EOF
 
 # If a back cover was generated, include it as the final page
@@ -1131,10 +1360,18 @@ generate_ebook_format() {
         pdf)
             output_file="${output_dir}/$(basename "$input_file" .md).pdf"
             echo "📄 Generating PDF format..."
-            
+            cat << 'EOF' > "$EXPORTS_DIR/disable-title.tex"
+\renewcommand{\maketitle}{}
+\usepackage{titlesec}
+\titleformat{\section}{\centering\fontsize{28}{32}\selectfont\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}{\centering\fontsize{20}{24}\selectfont\bfseries}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}{\centering\fontsize{14}{18}\selectfont\bfseries}{\thesubsubsection}{1em}{}
+EOF
+
             # Try direct PDF generation first (simplest approach)
             (cd "$output_dir" && pandoc -f markdown -t pdf --pdf-engine=lualatex \
                 --metadata-file="$(basename "$metadata")" \
+                -H disable-title.tex \
                 -o "$(basename "$output_file")" "$(basename "$input_file")") && {
                 echo "✅ PDF created: $(basename "$output_file")"
                 return 0
@@ -1218,14 +1455,30 @@ EOF
                     generate_ebook_format "epub" "$input_file" "$title" "$metadata" "$css" "$cover" "$output_dir"
                 fi
                 
-                echo "� Converting to MOBI format (for Kindle)..."
-                ebook-convert "$epub_file" "$output_file" \
-                    --title="$title" \
-                    --authors="$AUTHOR" \
-                    --publisher="$PUBLISHER" \
-                    --cover="$cover" \
-                    --language="en" \
-                    --isbn="$ISBN"
+                echo "📚 Converting to MOBI format (for Kindle)..."
+                
+                # Build conversion command based on available cover
+                local convert_cmd="ebook-convert \"$epub_file\" \"$output_file\" \
+                    --title=\"$title\" \
+                    --authors=\"$AUTHOR\" \
+                    --publisher=\"$PUBLISHER\" \
+                    --language=\"en\""
+                
+                # Only add cover parameter if the file actually exists
+                if [ -n "$cover" ] && [ -f "$cover" ]; then
+                    convert_cmd="$convert_cmd --cover=\"$cover\""
+                    echo "   🖼️ Using cover: $(basename "$cover")"
+                else
+                    echo "   ⚠️ No cover image found, creating without cover"
+                fi
+                
+                # Add ISBN if available
+                if [ -n "$ISBN" ]; then
+                    convert_cmd="$convert_cmd --isbn=\"$ISBN\""
+                fi
+                
+                # Execute the conversion
+                eval "$convert_cmd"
                 
                 echo "✅ MOBI created: $(basename "$output_file")"
             else
@@ -1245,13 +1498,29 @@ EOF
                 fi
                 
                 echo "📚 Converting to AZW3 format (enhanced Kindle)..."
-                ebook-convert "$epub_file" "$output_file" \
-                    --title="$title" \
-                    --authors="$AUTHOR" \
-                    --publisher="$PUBLISHER" \
-                    --cover="$cover" \
-                    --language="en" \
-                    --isbn="$ISBN"
+                
+                # Build conversion command based on available cover
+                local convert_cmd="ebook-convert \"$epub_file\" \"$output_file\" \
+                    --title=\"$title\" \
+                    --authors=\"$AUTHOR\" \
+                    --publisher=\"$PUBLISHER\" \
+                    --language=\"en\""
+                
+                # Only add cover parameter if the file actually exists
+                if [ -n "$cover" ] && [ -f "$cover" ]; then
+                    convert_cmd="$convert_cmd --cover=\"$cover\""
+                    echo "   🖼️ Using cover: $(basename "$cover")"
+                else
+                    echo "   ⚠️ No cover image found, creating without cover"
+                fi
+                
+                # Add ISBN if available
+                if [ -n "$ISBN" ]; then
+                    convert_cmd="$convert_cmd --isbn=\"$ISBN\""
+                fi
+                
+                # Execute the conversion
+                eval "$convert_cmd"
                 
                 echo "✅ AZW3 created: $(basename "$output_file")"
             else
@@ -1273,10 +1542,18 @@ echo "📚 Exporting book in requested formats..."
 
 # Set default cover if none provided
 if [ -z "$COVER_IMAGE" ]; then
-    COVER_IMAGE="$EXPORTS_DIR/generated_cover.jpg"
-    if [ ! -f "$COVER_IMAGE" ] && [ "$GENERATE_COVER" = true ]; then
-    # Generate both front and back covers and set COVER_IMAGE/BACK_COVER
-    generate_book_cover "$BOOK_TITLE" "$EXPORTS_DIR" || true
+    if [ "$GENERATE_COVER" = true ]; then
+        # Generate both front and back covers and set COVER_IMAGE/BACK_COVER
+        generate_book_cover "$BOOK_TITLE" "$EXPORTS_DIR" || true
+    else
+        # Only set COVER_IMAGE if the file actually exists
+        if [ -f "$EXPORTS_DIR/generated_cover_front.jpg" ]; then
+            COVER_IMAGE="$EXPORTS_DIR/generated_cover_front.jpg"
+        else
+            echo "⚠️ No cover image provided and auto-generation not enabled"
+            # Leave COVER_IMAGE empty to signal no cover available
+            COVER_IMAGE=""
+        fi
     fi
 fi
 

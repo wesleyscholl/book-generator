@@ -2081,3 +2081,732 @@ DEBUG: call_ollama_api started with prompt length: 662, system_prompt length: 65
 DEBUG: Using model: , temperature: 0.95, max_tokens: 128000, ctx: 4096
 DEBUG: Using formatted prompt length: 1350
 DEBUG: About to make curl request to Ollama
+DEBUG: call_ollama_api started with prompt length: 789, system_prompt length: 656
+DEBUG: Using model: , temperature: 0.95, max_tokens: 128000, ctx: 4096
+DEBUG: Using formatted prompt length: 1477
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 23485 characters
+DEBUG: Successfully extracted response, length: 11225
+DEBUG: call_ollama_api started with prompt length: 11582, system_prompt length: 195
+DEBUG: Using model: , temperature: 0.5, max_tokens: 128000, ctx: 4096
+DEBUG: Using formatted prompt length: 11809
+DEBUG: About to make curl request to Ollama
+DEBUG: call_ollama_api started with prompt length: 662, system_prompt length: 656
+DEBUG: Using model: , temperature: 0.95, max_tokens: 128000, ctx: 4096
+DEBUG: Using formatted prompt length: 1350
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 8384 characters
+DEBUG: Successfully extracted response, length: 3351
+DEBUG: call_ollama_api started with prompt length: 753, system_prompt length: 656
+DEBUG: Using model: , temperature: 0.95, max_tokens: 128000, ctx: 4096
+DEBUG: Using formatted prompt length: 1441
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 10971 characters
+DEBUG: Successfully extracted response, length: 4382
+DEBUG: call_ollama_api started with prompt length: 5627, system_prompt length: 368
+DEBUG: Using model: , temperature: 0.95, max_tokens: 128000, ctx: 4096
+DEBUG: Using formatted prompt length: 6027
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 15151 characters
+DEBUG: Successfully extracted response, length: 4507
+DEBUG: call_ollama_api started with prompt length: 5012, system_prompt length: 368
+DEBUG: Using model: , temperature: 0.95, max_tokens: 128000, ctx: 4096
+DEBUG: Using formatted prompt length: 5412
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 20508 characters
+DEBUG: Successfully extracted response, length: 8028
+DEBUG: call_ollama_api started with prompt length: 13678, system_prompt length: 368
+DEBUG: Using model: , temperature: 0.95, max_tokens: 128000, ctx: 4096
+DEBUG: Using formatted prompt length: 14078
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 23571 characters
+DEBUG: Successfully extracted response, length: 5203
+DEBUG: call_ollama_api started with prompt length: 5628, system_prompt length: 368
+DEBUG: Using model: , temperature: 0.95, max_tokens: 128000, ctx: 4096
+DEBUG: Using formatted prompt length: 6028
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 25814 characters
+DEBUG: Successfully extracted response, length: 10722
+DEBUG: call_ollama_api started with prompt length: 10978, system_prompt length: 368
+DEBUG: Using model: , temperature: 0.6, max_tokens: 2048, ctx: 4096
+DEBUG: Using formatted prompt length: 11378
+DEBUG: About to make curl request to Ollama
+DEBUG: call_ollama_api started with prompt length: 815, system_prompt length: 656
+DEBUG: Using model: , temperature: 0.95, max_tokens: 128000, ctx: 4096
+DEBUG: Using formatted prompt length: 1503
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 12909 characters
+DEBUG: Successfully extracted response, length: 5669
+DEBUG: call_ollama_api started with prompt length: 1323, system_prompt length: 1188
+DEBUG: Using model: , temperature: 0.95, max_tokens: 128000, ctx: 4096
+DEBUG: Using formatted prompt length: 2543
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 17023 characters
+DEBUG: Successfully extracted response, length: 7318
+DEBUG: call_ollama_api started with prompt length: 1423, system_prompt length: 1188
+DEBUG: Using model: , temperature: 0.95, max_tokens: 128000, ctx: 4096
+DEBUG: Using formatted prompt length: 2643
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 16504 characters
+DEBUG: Successfully extracted response, length: 6861
+DEBUG: call_ollama_api started with prompt length: 8580, system_prompt length: 368
+DEBUG: Using model: , temperature: 0.95, max_tokens: 128000, ctx: 4096
+DEBUG: Using formatted prompt length: 8980
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 15175 characters
+DEBUG: Successfully extracted response, length: 3528
+DEBUG: call_ollama_api started with prompt length: 4033, system_prompt length: 368
+DEBUG: Using model: , temperature: 0.95, max_tokens: 128000, ctx: 4096
+DEBUG: Using formatted prompt length: 4433
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 13832 characters
+DEBUG: Successfully extracted response, length: 4286
+DEBUG: call_ollama_api started with prompt length: 4541, system_prompt length: 368
+DEBUG: Using model: , temperature: 0.6, max_tokens: 8192, ctx: 4096
+DEBUG: Using formatted prompt length: 4941
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 13373 characters
+DEBUG: Successfully extracted response, length: 4657
+DEBUG: call_ollama_api started with prompt length: 9202, system_prompt length: 368
+DEBUG: Using model: , temperature: 0.6, max_tokens: 8192, ctx: 4096
+DEBUG: Using formatted prompt length: 9602
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 22903 characters
+DEBUG: Successfully extracted response, length: 7527
+DEBUG: call_ollama_api started with prompt length: 25092, system_prompt length: 368
+DEBUG: Using model: , temperature: 0.95, max_tokens: 128000, ctx: 4096
+DEBUG: Using formatted prompt length: 25492
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 34184 characters
+DEBUG: Successfully extracted response, length: 5825
+DEBUG: call_ollama_api started with prompt length: 4272, system_prompt length: 368
+DEBUG: Using model: , temperature: 0.95, max_tokens: 128000, ctx: 4096
+DEBUG: Using formatted prompt length: 4672
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 19066 characters
+DEBUG: Successfully extracted response, length: 6530
+DEBUG: call_ollama_api started with prompt length: 3261, system_prompt length: 368
+DEBUG: Using model: , temperature: 0.6, max_tokens: 8192, ctx: 4096
+DEBUG: Using formatted prompt length: 3661
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 12768 characters
+DEBUG: Successfully extracted response, length: 4794
+DEBUG: call_ollama_api started with prompt length: 8059, system_prompt length: 368
+DEBUG: Using model: , temperature: 0.6, max_tokens: 8192, ctx: 4096
+DEBUG: Using formatted prompt length: 8459
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 18389 characters
+DEBUG: Successfully extracted response, length: 5528
+DEBUG: call_ollama_api started with prompt length: 13590, system_prompt length: 368
+DEBUG: Using model: , temperature: 0.6, max_tokens: 8192, ctx: 4096
+DEBUG: Using formatted prompt length: 13990
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 69828 characters
+DEBUG: Successfully extracted response, length: 29767
+DEBUG: call_ollama_api started with prompt length: 25159, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.95, max_tokens: 128000, ctx: 4096
+DEBUG: Using formatted prompt length: 25637
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 29247 characters
+DEBUG: Successfully extracted response, length: 3202
+DEBUG: call_ollama_api started with prompt length: 3864, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.95, max_tokens: 2076, ctx: 4096
+DEBUG: Using formatted prompt length: 4342
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 14407 characters
+DEBUG: Successfully extracted response, length: 4362
+DEBUG: call_ollama_api started with prompt length: 4868, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.6, max_tokens: 1912, ctx: 4096
+DEBUG: Using formatted prompt length: 5346
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 15131 characters
+DEBUG: Successfully extracted response, length: 5239
+DEBUG: call_ollama_api started with prompt length: 6709, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.6, max_tokens: 869, ctx: 4096
+DEBUG: Using formatted prompt length: 7187
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 16683 characters
+DEBUG: Successfully extracted response, length: 5214
+DEBUG: call_ollama_api started with prompt length: 23517, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.95, max_tokens: 128000, ctx: 4096
+DEBUG: Using formatted prompt length: 23995
+DEBUG: About to make curl request to Ollama
+DEBUG: call_ollama_api started with prompt length: 16452, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.95, max_tokens: , ctx: 4096
+DEBUG: Using formatted prompt length: 16930
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 32 characters
+DEBUG: Failed to extract .response from JSON, error: missing request body
+DEBUG: call_ollama_api started with prompt length: 16452, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.95, max_tokens: , ctx: 4096
+DEBUG: Using formatted prompt length: 16930
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 32 characters
+DEBUG: Failed to extract .response from JSON, error: missing request body
+DEBUG: call_ollama_api started with prompt length: 16452, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.95, max_tokens: , ctx: 4096
+DEBUG: Using formatted prompt length: 16930
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 32 characters
+DEBUG: Failed to extract .response from JSON, error: missing request body
+DEBUG: call_ollama_api started with prompt length: 16452, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.95, max_tokens: , ctx: 4096
+DEBUG: Using formatted prompt length: 16930
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 32 characters
+DEBUG: Failed to extract .response from JSON, error: missing request body
+DEBUG: call_ollama_api started with prompt length: 16452, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.95, max_tokens: , ctx: 4096
+DEBUG: Using formatted prompt length: 16930
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 32 characters
+DEBUG: Failed to extract .response from JSON, error: missing request body
+DEBUG: call_ollama_api started with prompt length: 16452, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.95, max_tokens: , ctx: 4096
+DEBUG: Using formatted prompt length: 16930
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 32 characters
+DEBUG: Failed to extract .response from JSON, error: missing request body
+DEBUG: call_ollama_api started with prompt length: 16452, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.95, max_tokens: , ctx: 4096
+DEBUG: Using formatted prompt length: 16930
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 32 characters
+DEBUG: Failed to extract .response from JSON, error: missing request body
+DEBUG: call_ollama_api started with prompt length: 16452, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.95, max_tokens: 8192, ctx: 4096
+DEBUG: Using formatted prompt length: 16930
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 58406 characters
+DEBUG: Successfully extracted response, length: 22525
+DEBUG: call_ollama_api started with prompt length: 22963, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.95, max_tokens: 8192, ctx: 4096
+DEBUG: Using formatted prompt length: 23441
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 26077 characters
+DEBUG: Successfully extracted response, length: 687
+DEBUG: call_ollama_api started with prompt length: 942, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.6, max_tokens: 8192, ctx: 4096
+DEBUG: Using formatted prompt length: 1420
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 10387 characters
+DEBUG: Successfully extracted response, length: 4513
+DEBUG: call_ollama_api started with prompt length: 5458, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.6, max_tokens: 8192, ctx: 4096
+DEBUG: Using formatted prompt length: 5936
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 17889 characters
+DEBUG: Successfully extracted response, length: 6187
+DEBUG: call_ollama_api started with prompt length: 11648, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.6, max_tokens: 8192, ctx: 4096
+DEBUG: Using formatted prompt length: 12126
+DEBUG: About to make curl request to Ollama
+DEBUG: call_ollama_api started with prompt length: 8223, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.95, max_tokens: 8192, ctx: 4096
+DEBUG: Using formatted prompt length: 8701
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 15741 characters
+DEBUG: Successfully extracted response, length: 3762
+DEBUG: call_ollama_api started with prompt length: 4211, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.95, max_tokens: 8192, ctx: 4096
+DEBUG: Using formatted prompt length: 4689
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 15136 characters
+DEBUG: Successfully extracted response, length: 4475
+DEBUG: call_ollama_api started with prompt length: 4744, system_prompt length: 98
+DEBUG: Using model: , temperature: 0.7, max_tokens: 2319, ctx: 4096
+DEBUG: Using formatted prompt length: 4874
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 27326 characters
+DEBUG: Successfully extracted response, length: 9814
+DEBUG: call_ollama_api started with prompt length: 8403, system_prompt length: 98
+DEBUG: Using model: , temperature: 0.7, max_tokens: 2023, ctx: 4096
+DEBUG: Using formatted prompt length: 8533
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 24901 characters
+DEBUG: Successfully extracted response, length: 6358
+DEBUG: call_ollama_api started with prompt length: 0, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.8, max_tokens: 0, ctx: 4096
+DEBUG: Using formatted prompt length: 478
+DEBUG: About to make curl request to Ollama
+DEBUG: call_ollama_api started with prompt length: 13892, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.95, max_tokens: 8192, ctx: 4096
+DEBUG: Using formatted prompt length: 14370
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 33892 characters
+DEBUG: Successfully extracted response, length: 10717
+DEBUG: call_ollama_api started with prompt length: 10906, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.95, max_tokens: 8192, ctx: 4096
+DEBUG: Using formatted prompt length: 11384
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 23342 characters
+DEBUG: Successfully extracted response, length: 4972
+DEBUG: call_ollama_api started with prompt length: 5409, system_prompt length: 98
+DEBUG: Using model: , temperature: 0.7, max_tokens: 970, ctx: 4096
+DEBUG: Using formatted prompt length: 5539
+DEBUG: About to make curl request to Ollama
+DEBUG: call_ollama_api started with prompt length: 13218, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.95, max_tokens: 8192, ctx: 4096
+DEBUG: Using formatted prompt length: 13696
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 27817 characters
+DEBUG: Successfully extracted response, length: 7981
+DEBUG: call_ollama_api started with prompt length: 8419, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.95, max_tokens: 8192, ctx: 4096
+DEBUG: Using formatted prompt length: 8897
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 15583 characters
+DEBUG: Successfully extracted response, length: 4012
+DEBUG: call_ollama_api started with prompt length: 3688, system_prompt length: 98
+DEBUG: Using model: , temperature: 0.7, max_tokens: 1236, ctx: 4096
+DEBUG: Using formatted prompt length: 3818
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 18084 characters
+DEBUG: Successfully extracted response, length: 6697
+DEBUG: call_ollama_api started with prompt length: 3861, system_prompt length: 98
+DEBUG: Using model: , temperature: 0.7, max_tokens: 1490, ctx: 4096
+DEBUG: Using formatted prompt length: 3991
+DEBUG: About to make curl request to Ollama
+DEBUG: call_ollama_api started with prompt length: 11670, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.95, max_tokens: 8192, ctx: 4096
+DEBUG: Using formatted prompt length: 12148
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 22574 characters
+DEBUG: Successfully extracted response, length: 6077
+DEBUG: call_ollama_api started with prompt length: 5909, system_prompt length: 98
+DEBUG: Using model: , temperature: 0.7, max_tokens: 861, ctx: 4096
+DEBUG: Using formatted prompt length: 6039
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 23980 characters
+DEBUG: Successfully extracted response, length: 8477
+DEBUG: call_ollama_api started with prompt length: 6678, system_prompt length: 98
+DEBUG: Using model: , temperature: 0.7, max_tokens: 872, ctx: 4096
+DEBUG: Using formatted prompt length: 6808
+DEBUG: About to make curl request to Ollama
+DEBUG: call_ollama_api started with prompt length: 23504, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.95, max_tokens: 8192, ctx: 4096
+DEBUG: Using formatted prompt length: 23982
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 31747 characters
+DEBUG: Successfully extracted response, length: 5225
+DEBUG: call_ollama_api started with prompt length: 5356, system_prompt length: 98
+DEBUG: Using model: , temperature: 0.7, max_tokens: 911, ctx: 4096
+DEBUG: Using formatted prompt length: 5486
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 21155 characters
+DEBUG: Successfully extracted response, length: 7143
+DEBUG: call_ollama_api started with prompt length: 15765, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.95, max_tokens: 8192, ctx: 4096
+DEBUG: Using formatted prompt length: 16243
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 23411 characters
+DEBUG: Successfully extracted response, length: 4710
+DEBUG: call_ollama_api started with prompt length: 4846, system_prompt length: 98
+DEBUG: Using model: , temperature: 0.7, max_tokens: 1041, ctx: 4096
+DEBUG: Using formatted prompt length: 4976
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 16680 characters
+DEBUG: Successfully extracted response, length: 6576
+DEBUG: call_ollama_api started with prompt length: 6107, system_prompt length: 98
+DEBUG: Using model: , temperature: 0.7, max_tokens: 976, ctx: 4096
+DEBUG: Using formatted prompt length: 6237
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 19605 characters
+DEBUG: Successfully extracted response, length: 6789
+DEBUG: call_ollama_api started with prompt length: 0, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.8, max_tokens: 0, ctx: 4096
+DEBUG: Using formatted prompt length: 478
+DEBUG: About to make curl request to Ollama
+DEBUG: call_ollama_api started with prompt length: 15752, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.95, max_tokens: 32000, ctx: 4096
+DEBUG: Using formatted prompt length: 16230
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 32002 characters
+DEBUG: Successfully extracted response, length: 9373
+DEBUG: call_ollama_api started with prompt length: 9853, system_prompt length: 83
+DEBUG: Using model: , temperature: 0.7, max_tokens: 3000, ctx: 4096
+DEBUG: Using formatted prompt length: 9968
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 32596 characters
+DEBUG: Successfully extracted response, length: 13055
+DEBUG: call_ollama_api started with prompt length: 21751, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.95, max_tokens: 32000, ctx: 4096
+DEBUG: Using formatted prompt length: 22229
+DEBUG: About to make curl request to Ollama
+DEBUG: call_ollama_api started with prompt length: 21738, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.9, max_tokens: 32000, ctx: 4096
+DEBUG: Using formatted prompt length: 22216
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 30840 characters
+DEBUG: Successfully extracted response, length: 6031
+DEBUG: call_ollama_api started with prompt length: 6467, system_prompt length: 98
+DEBUG: Using model: , temperature: 0.7, max_tokens: 667, ctx: 4096
+DEBUG: Using formatted prompt length: 6597
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 17668 characters
+DEBUG: Successfully extracted response, length: 6089
+DEBUG: call_ollama_api started with prompt length: 6525, system_prompt length: 98
+DEBUG: Using model: , temperature: 0.7, max_tokens: 786, ctx: 4096
+DEBUG: Using formatted prompt length: 6655
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 20058 characters
+DEBUG: Successfully extracted response, length: 6478
+DEBUG: call_ollama_api started with prompt length: 6914, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.8, max_tokens: 688, ctx: 4096
+DEBUG: Using formatted prompt length: 7392
+DEBUG: About to make curl request to Ollama
+DEBUG: call_ollama_api started with prompt length: 15161, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.9, max_tokens: 6500, ctx: 4096
+DEBUG: Using formatted prompt length: 15639
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 21519 characters
+DEBUG: Successfully extracted response, length: 3708
+DEBUG: call_ollama_api started with prompt length: 3077, system_prompt length: 98
+DEBUG: Using model: , temperature: 0.7, max_tokens: 1321, ctx: 4096
+DEBUG: Using formatted prompt length: 3207
+DEBUG: About to make curl request to Ollama
+DEBUG: call_ollama_api started with prompt length: 11323, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.9, max_tokens: 16000, ctx: 4096
+DEBUG: Using formatted prompt length: 11801
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 20124 characters
+DEBUG: Successfully extracted response, length: 4656
+DEBUG: call_ollama_api started with prompt length: 3678, system_prompt length: 98
+DEBUG: Using model: , temperature: 0.7, max_tokens: 1169, ctx: 4096
+DEBUG: Using formatted prompt length: 3808
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 3929 characters
+DEBUG: Successfully extracted response, length: 29
+DEBUG: call_ollama_api started with prompt length: 464, system_prompt length: 98
+DEBUG: Using model: , temperature: 0.7, max_tokens: 2167, ctx: 4096
+DEBUG: Using formatted prompt length: 594
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 2723 characters
+DEBUG: Successfully extracted response, length: 773
+DEBUG: call_ollama_api started with prompt length: 873, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.8, max_tokens: 2059, ctx: 4096
+DEBUG: Using formatted prompt length: 1351
+DEBUG: About to make curl request to Ollama
+DEBUG: call_ollama_api started with prompt length: 9120, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.9, max_tokens: 64000, ctx: 4096
+DEBUG: Using formatted prompt length: 9598
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 20924 characters
+DEBUG: Successfully extracted response, length: 6087
+DEBUG: call_ollama_api started with prompt length: 5085, system_prompt length: 98
+DEBUG: Using model: , temperature: 0.7, max_tokens: 934, ctx: 4096
+DEBUG: Using formatted prompt length: 5215
+DEBUG: About to make curl request to Ollama
+DEBUG: call_ollama_api started with prompt length: 13331, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.9, max_tokens: 64000, ctx: 4096
+DEBUG: Using formatted prompt length: 13809
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 23770 characters
+DEBUG: Successfully extracted response, length: 5625
+DEBUG: call_ollama_api started with prompt length: 4747, system_prompt length: 98
+DEBUG: Using model: , temperature: 0.7, max_tokens: 1024, ctx: 4096
+DEBUG: Using formatted prompt length: 4877
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 16093 characters
+DEBUG: Successfully extracted response, length: 5908
+DEBUG: call_ollama_api started with prompt length: 4882, system_prompt length: 98
+DEBUG: Using model: , temperature: 0.7, max_tokens: 1202, ctx: 4096
+DEBUG: Using formatted prompt length: 5012
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 21861 characters
+DEBUG: Successfully extracted response, length: 7739
+DEBUG: call_ollama_api started with prompt length: 5473, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.8, max_tokens: 1066, ctx: 4096
+DEBUG: Using formatted prompt length: 5951
+DEBUG: About to make curl request to Ollama
+DEBUG: call_ollama_api started with prompt length: 13718, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.9, max_tokens: 64000, ctx: 4096
+DEBUG: Using formatted prompt length: 14196
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 22998 characters
+DEBUG: Successfully extracted response, length: 5159
+DEBUG: call_ollama_api started with prompt length: 4063, system_prompt length: 98
+DEBUG: Using model: , temperature: 0.7, max_tokens: 1179, ctx: 4096
+DEBUG: Using formatted prompt length: 4193
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 13509 characters
+DEBUG: Successfully extracted response, length: 4948
+DEBUG: call_ollama_api started with prompt length: 4005, system_prompt length: 98
+DEBUG: Using model: , temperature: 0.7, max_tokens: 1423, ctx: 4096
+DEBUG: Using formatted prompt length: 4135
+DEBUG: About to make curl request to Ollama
+DEBUG: call_ollama_api started with prompt length: 12249, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.9, max_tokens: 64000, ctx: 4096
+DEBUG: Using formatted prompt length: 12727
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 20042 characters
+DEBUG: Successfully extracted response, length: 4369
+DEBUG: call_ollama_api started with prompt length: 4082, system_prompt length: 83
+DEBUG: Using model: , temperature: 0.7, max_tokens: 32000, ctx: 4096
+DEBUG: Using formatted prompt length: 4197
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 10675 characters
+DEBUG: Successfully extracted response, length: 3559
+DEBUG: call_ollama_api started with prompt length: 12253, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.9, max_tokens: 64000, ctx: 4096
+DEBUG: Using formatted prompt length: 12731
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 18681 characters
+DEBUG: Successfully extracted response, length: 3637
+DEBUG: call_ollama_api started with prompt length: 2423, system_prompt length: 98
+DEBUG: Using model: , temperature: 0.7, max_tokens: 830, ctx: 4096
+DEBUG: Using formatted prompt length: 2553
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 9547 characters
+DEBUG: Successfully extracted response, length: 3646
+DEBUG: call_ollama_api started with prompt length: 2494, system_prompt length: 98
+DEBUG: Using model: , temperature: 0.7, max_tokens: 980, ctx: 4096
+DEBUG: Using formatted prompt length: 2624
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 15940 characters
+DEBUG: Successfully extracted response, length: 6447
+DEBUG: call_ollama_api started with prompt length: 2914, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.8, max_tokens: 880, ctx: 4096
+DEBUG: Using formatted prompt length: 3392
+DEBUG: About to make curl request to Ollama
+DEBUG: call_ollama_api started with prompt length: 12240, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.9, max_tokens: 8192, ctx: 4096
+DEBUG: Using formatted prompt length: 12718
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 21006 characters
+DEBUG: Successfully extracted response, length: 4935
+DEBUG: call_ollama_api started with prompt length: 5065, system_prompt length: 83
+DEBUG: Using model: , temperature: 0.7, max_tokens: 3000, ctx: 4096
+DEBUG: Using formatted prompt length: 5180
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 14182 characters
+DEBUG: Successfully extracted response, length: 4868
+DEBUG: call_ollama_api started with prompt length: 13138, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.9, max_tokens: 8192, ctx: 4096
+DEBUG: Using formatted prompt length: 13616
+DEBUG: About to make curl request to Ollama
+DEBUG: call_ollama_api started with prompt length: 13125, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.95, max_tokens: 8192, ctx: 4096
+DEBUG: Using formatted prompt length: 13603
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 25737 characters
+DEBUG: Successfully extracted response, length: 6912
+DEBUG: call_ollama_api started with prompt length: 15032, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.95, max_tokens: 8192, ctx: 4096
+DEBUG: Using formatted prompt length: 15510
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 22729 characters
+DEBUG: Successfully extracted response, length: 4546
+DEBUG: call_ollama_api started with prompt length: 19245, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.95, max_tokens: 8192, ctx: 4096
+DEBUG: Using formatted prompt length: 19723
+DEBUG: About to make curl request to Ollama
+DEBUG: call_ollama_api started with prompt length: 0, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.95, max_tokens: 8192, ctx: 4096
+DEBUG: Using formatted prompt length: 478
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 8366 characters
+DEBUG: Successfully extracted response, length: 0
+DEBUG: call_ollama_api started with prompt length: 433, system_prompt length: 98
+DEBUG: Using model: , temperature: 0.7, max_tokens: 1187, ctx: 4096
+DEBUG: Using formatted prompt length: 563
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 1181 characters
+DEBUG: Successfully extracted response, length: 120
+DEBUG: call_ollama_api started with prompt length: 555, system_prompt length: 98
+DEBUG: Using model: , temperature: 0.7, max_tokens: 1390, ctx: 4096
+DEBUG: Using formatted prompt length: 685
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 2791 characters
+DEBUG: Successfully extracted response, length: 704
+DEBUG: call_ollama_api started with prompt length: 801, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.8, max_tokens: 1328, ctx: 4096
+DEBUG: Using formatted prompt length: 1279
+DEBUG: About to make curl request to Ollama
+DEBUG: call_ollama_api started with prompt length: 15570, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.95, max_tokens: 8192, ctx: 4096
+DEBUG: Using formatted prompt length: 16048
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 32706 characters
+DEBUG: Successfully extracted response, length: 9398
+DEBUG: call_ollama_api started with prompt length: 18253, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.95, max_tokens: 8192, ctx: 4096
+DEBUG: Using formatted prompt length: 18731
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 22613 characters
+DEBUG: Successfully extracted response, length: 2850
+DEBUG: call_ollama_api started with prompt length: 2040, system_prompt length: 98
+DEBUG: Using model: , temperature: 0.7, max_tokens: 875, ctx: 4096
+DEBUG: Using formatted prompt length: 2170
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 11223 characters
+DEBUG: Successfully extracted response, length: 4641
+DEBUG: call_ollama_api started with prompt length: 3560, system_prompt length: 98
+DEBUG: Using model: , temperature: 0.7, max_tokens: 702, ctx: 4096
+DEBUG: Using formatted prompt length: 3690
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 16888 characters
+DEBUG: Successfully extracted response, length: 6100
+DEBUG: call_ollama_api started with prompt length: 22204, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.95, max_tokens: 8192, ctx: 4096
+DEBUG: Using formatted prompt length: 22682
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 28174 characters
+DEBUG: Successfully extracted response, length: 3900
+DEBUG: call_ollama_api started with prompt length: 3215, system_prompt length: 98
+DEBUG: Using model: , temperature: 0.7, max_tokens: 682, ctx: 4096
+DEBUG: Using formatted prompt length: 3345
+DEBUG: About to make curl request to Ollama
+DEBUG: call_ollama_api started with prompt length: 18624, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.95, max_tokens: 32000, ctx: 4096
+DEBUG: Using formatted prompt length: 19102
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 30834 characters
+DEBUG: Successfully extracted response, length: 6870
+DEBUG: call_ollama_api started with prompt length: 14063, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.95, max_tokens: 32000, ctx: 4096
+DEBUG: Using formatted prompt length: 14541
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 25894 characters
+DEBUG: Successfully extracted response, length: 6523
+DEBUG: call_ollama_api started with prompt length: 18298, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.95, max_tokens: 32000, ctx: 4096
+DEBUG: Using formatted prompt length: 18776
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 23464 characters
+DEBUG: Successfully extracted response, length: 3469
+DEBUG: call_ollama_api started with prompt length: 3335, system_prompt length: 98
+DEBUG: Using model: , temperature: 0.7, max_tokens: 704, ctx: 4096
+DEBUG: Using formatted prompt length: 3465
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 12030 characters
+DEBUG: Successfully extracted response, length: 4735
+DEBUG: call_ollama_api started with prompt length: 22298, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.95, max_tokens: 32000, ctx: 4096
+DEBUG: Using formatted prompt length: 22776
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 27893 characters
+DEBUG: Successfully extracted response, length: 4167
+DEBUG: call_ollama_api started with prompt length: 26262, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.95, max_tokens: 32000, ctx: 4096
+DEBUG: Using formatted prompt length: 26740
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 32463 characters
+DEBUG: Successfully extracted response, length: 4859
+DEBUG: call_ollama_api started with prompt length: 29963, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.95, max_tokens: 32000, ctx: 4096
+DEBUG: Using formatted prompt length: 30441
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 32952 characters
+DEBUG: Successfully extracted response, length: 3481
+DEBUG: call_ollama_api started with prompt length: 3236, system_prompt length: 98
+DEBUG: Using model: , temperature: 0.7, max_tokens: 712, ctx: 4096
+DEBUG: Using formatted prompt length: 3366
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 11033 characters
+DEBUG: Successfully extracted response, length: 4147
+DEBUG: call_ollama_api started with prompt length: 3474, system_prompt length: 98
+DEBUG: Using model: , temperature: 0.7, max_tokens: 798, ctx: 4096
+DEBUG: Using formatted prompt length: 3604
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 14634 characters
+DEBUG: Successfully extracted response, length: 5563
+DEBUG: call_ollama_api started with prompt length: 3009, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.8, max_tokens: 890, ctx: 4096
+DEBUG: Using formatted prompt length: 3487
+DEBUG: About to make curl request to Ollama
+DEBUG: call_ollama_api started with prompt length: 17275, system_prompt length: 446
+DEBUG: Using model: , temperature: 0.95, max_tokens: 32000, ctx: 4096
+DEBUG: Using formatted prompt length: 17753
+DEBUG: About to make curl request to Ollama
