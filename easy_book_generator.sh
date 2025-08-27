@@ -35,6 +35,101 @@ count_numeric_chapters() {
     echo "$cnt"
 }
 
+# Function to list available book directories and select one
+# Returns the selected directory path in the book_dirs array
+# Usage: if get_book_dirs [required_chapters]; then ... fi
+get_book_dirs() {
+    local required_chapters=${1:-0}
+
+    echo "📁 Available book directories:"
+
+    # Check if any directories exist
+    if ! compgen -G "./book_outputs/*" >/dev/null; then
+        echo "   No books found in ./book_outputs/"
+        return 1
+    fi
+
+    # Clear the book_dirs array
+    book_dirs=()
+
+    # Iterate through book directories
+    for dir in ./book_outputs/*/; do
+        [ ! -d "$dir" ] && continue
+
+        local dir_name=$(basename "$dir")
+        local chapter_count
+        chapter_count=$(count_numeric_chapters "$dir")
+
+        # Skip directories that don't meet chapter requirement
+        [ "$chapter_count" -lt "$required_chapters" ] && continue
+
+        # Check for manuscript or exports
+        local has_manuscript=0
+        shopt -s nullglob
+        manuscript_files=("$dir"manuscript_original_*.md)
+        export_dirs=("$dir"exports_*)
+        shopt -u nullglob
+        [ ${#manuscript_files[@]} -gt 0 ] || [ ${#export_dirs[@]} -gt 0 ] && has_manuscript=1
+
+        # Check for bibliography
+        local has_bibliography
+        has_bibliography=$(find "$dir" -name "final_bibliography.md" -print -quit)
+
+        # Append to array
+        book_dirs+=("$dir")
+
+        # Build optional tags
+        local extra_tags=()
+        [ "$has_manuscript" -eq 1 ] && extra_tags+=("Manuscript ready")
+        [ -n "$has_bibliography" ] && extra_tags+=("📃 Bibliography created")
+        local extras=""
+        [ ${#extra_tags[@]} -gt 0 ] && extras=", ${extra_tags[*]}"
+
+        # Format display
+        local display_name=""
+        if [[ "$dir_name" == *"-"*"_"*"_"* || "$dir_name" == *"-"*"-"*"-"* ]]; then
+            # Topic-based directory with timestamp
+            display_name=$(echo "$dir_name" | sed -E 's/-[0-9]{8}_[0-9]{6}$//' | sed 's/-/ /g')
+            display_name=$(echo "$display_name" | awk '{for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2); print}')
+        else
+            display_name="$dir_name"
+        fi
+
+        # Timestamp for date display
+        local timestamp
+        timestamp=$(echo "$dir_name" | grep -o '[0-9]\{8\}_[0-9]\{6\}')
+        local formatted_date=""
+        if [ -n "$timestamp" ]; then
+            local year="${timestamp:0:4}"
+            local month="${timestamp:4:2}"
+            local day="${timestamp:6:2}"
+            local hour="${timestamp:9:2}"
+            local minute="${timestamp:11:2}"
+            formatted_date="Created: ${year}-${month}-${day} ${hour}:${minute}"
+        fi
+
+        # Display the menu
+        local index=$(( ${#book_dirs[@]} ))  # 1-based for menu
+        echo -n "    $index) 📚 $display_name ($chapter_count chapter"
+        [ "$chapter_count" -ne 1 ] && echo -n "s"
+        [ -n "$extras" ] && echo -n "$extras"
+        [ -n "$formatted_date" ] && echo -n ", $formatted_date"
+        echo ")"
+    done
+
+    # If no books found
+    if [ ${#book_dirs[@]} -eq 0 ]; then
+        if [ "$required_chapters" -gt 0 ]; then
+            echo "   No books with at least $required_chapters chapter(s) found"
+        else
+            echo "   No books found"
+        fi
+        return 1
+    fi
+
+    return 0
+}
+
 # Function to make API requests
 make_api_request() {
     local payload="$1"
@@ -703,109 +798,107 @@ generate_chapters_from_outline() {
 }
 
 generate_references_menu() {
-    echo ""
-    echo "📁 Available book directories for references generation:"
-
-    # Collect candidate directories (same logic used elsewhere)
-    DIRS=()
-    if [ -d "./book_outputs" ]; then
-        for d in ./book_outputs/*/; do
-            [ -d "$d" ] || continue
-            DIRS+=("$d")
-        done
+    echo "🧾 Generate References for a Book"
+    echo
+    
+    if ! get_book_dirs 1; then
+        echo
+        echo "❌ No books with chapters found to generate references for"
+        echo
+        echo "Press Enter to return to the main menu"
+        read -r
+        return
     fi
-
-    if [ ${#DIRS[@]} -eq 0 ]; then
-        echo "❌ No book directories found in ./book_outputs"
-        return 1
-    fi
-
-    for i in "${!DIRS[@]}"; do
-        name=$(basename "${DIRS[$i]}")
-    count=$(count_numeric_chapters "${DIRS[$i]}")
-        if [ "$count" -eq 0 ]; then
-            echo "   $((i+1))) 📑 $name (no chapters)"
-        elif [ "$count" -eq 1 ]; then
-            echo "   $((i+1))) 📚 $name (1 chapter)"
-        else
-            echo "   $((i+1))) 📚 $name ($count chapters)"
+    
+    echo
+    echo "Select a book to generate references for (or 0 to cancel):"
+    read -r selection
+    
+    if [[ ! "$selection" =~ ^[0-9]+$ ]] || [ "$selection" -lt 1 ] || [ "$selection" -gt "${#book_dirs[@]}" ]; then
+        if [ "$selection" = "0" ]; then
+            echo "Operation canceled."
+            return
         fi
-    done
-
-    echo ""
-    read -p "Select directory (1-${#DIRS[@]}): " choice
-    if [[ ! "$choice" =~ ^[0-9]+$ ]] || [ "$choice" -lt 1 ] || [ "$choice" -gt "${#DIRS[@]}" ]; then
         echo "❌ Invalid selection"
-        return 1
+        echo
+        echo "Press Enter to return to the main menu"
+        read -r
+        return
     fi
-
-    SELECTED_DIR="${DIRS[$((choice-1))]}"
-    echo "Selected: $(basename "$SELECTED_DIR")"
-    read -p "Batch size for Gemini calls (default 2): " batch
-    batch=${batch:-2}
-
+    
+    selected_dir="${book_dirs[$selection]}"
+    book_name=$(basename "$selected_dir")
+    
+    echo
+    echo "📊 Generating references for $book_name..."
+    
+    # Ask for batch size
+    echo
+    echo "Enter batch size for Gemini calls (default 2, lower for fewer tokens):"
+    read -r batch_size
+    
+    if [[ ! "$batch_size" =~ ^[0-9]+$ ]]; then
+        batch_size=2
+        echo "Using default batch size: 2"
+    fi
+    
+    # Check if generate_references.sh exists
     if [ ! -f "./generate_references.sh" ]; then
         echo "❌ generate_references.sh not found in current directory"
+        echo
+        echo "Press Enter to return to the main menu"
+        read -r
         return 1
     fi
-
+    
     chmod +x ./generate_references.sh
-    echo "🔗 Invoking generate_references.sh on $SELECTED_DIR with batch size $batch"
-    ./generate_references.sh "$SELECTED_DIR" "$batch"
+    
+    # Run reference generation
+    echo "� Running reference generation script..."
+    if ./generate_references.sh "$selected_dir" "$batch_size"; then
+        echo "✅ References generation complete"
+    else
+        echo "❌ References generation failed"
+    fi
+    
+    echo
+    echo "Press Enter to return to the main menu"
+    read -r
 }
 
 review_and_edit_book() {
     local BOOK_DIR="$1"
     
     if [ -z "$BOOK_DIR" ]; then
-        echo ""
-        echo "📁 Available book directories:"
+        echo "✨ Review & Edit Existing Book"
+        echo
         
-        # Look for all types of book directories
-        OLD_BOOK_DIRS=($(ls -d ./book_outputs/book_outline_* 2>/dev/null))
-        NEW_BOOK_DIRS=($(ls -d ./book_outputs/*-[0-9]*_[0-9]* 2>/dev/null))
-        # Dynamic directories with sanitized topic names (format: topic-YYYYMMDD_HHMMSS)
-        TOPIC_DIRS=($(ls -d ./book_outputs/*-2*_*_* 2>/dev/null))
+        if ! get_book_dirs 1; then
+            echo
+            echo "❌ No books with chapters found to edit"
+            echo
+            echo "Press Enter to return to the main menu"
+            read -r
+            return
+        fi
         
-        declare -a ALL_BOOK_DIRS
+        echo
+        echo "Select a book to edit (or 0 to cancel):"
+        read -r selection
         
-        # Add old format directories
-        for dir in "${OLD_BOOK_DIRS[@]}"; do
-            ALL_BOOK_DIRS+=("$dir")
-        done
-        
-        # Add new format directories
-        for dir in "${NEW_BOOK_DIRS[@]}"; do
-            ALL_BOOK_DIRS+=("$dir")
-        done
-        
-        # Add topic-based dynamic directories
-        for dir in "${TOPIC_DIRS[@]}"; do
-            if [[ ! " ${ALL_BOOK_DIRS[*]} " =~ " ${dir} " ]]; then
-                ALL_BOOK_DIRS+=("$dir")
+        if [[ ! "$selection" =~ ^[0-9]+$ ]] || [ "$selection" -lt 1 ] || [ "$selection" -gt "${#book_dirs[@]}" ]; then
+            if [ "$selection" = "0" ]; then
+                echo "Operation canceled."
+                return
             fi
-        done
-        
-        if [ ${#ALL_BOOK_DIRS[@]} -eq 0 ]; then
-            echo "❌ No book directories found"
-            return 1
-        fi
-        
-        for i in "${!ALL_BOOK_DIRS[@]}"; do
-            DIR_NAME=$(basename "${ALL_BOOK_DIRS[$i]}")
-            CHAPTER_COUNT=$(count_numeric_chapters "${ALL_BOOK_DIRS[$i]}")
-            echo "   $((i+1))) $DIR_NAME ($CHAPTER_COUNT chapters)"
-        done
-        
-        echo ""
-        read -p "Select directory (1-${#ALL_BOOK_DIRS[@]}): " dir_choice
-        
-        if [[ ! "$dir_choice" =~ ^[0-9]+$ ]] || [ "$dir_choice" -lt 1 ] || [ "$dir_choice" -gt "${#ALL_BOOK_DIRS[@]}" ]; then
             echo "❌ Invalid selection"
-            return 1
+            echo
+            echo "Press Enter to return to the main menu"
+            read -r
+            return
         fi
         
-        BOOK_DIR="${ALL_BOOK_DIRS[$((dir_choice-1))]}"
+        BOOK_DIR="${book_dirs[$selection]}"
     fi
     
     echo ""
@@ -1050,78 +1143,112 @@ EOF
 }
 
 compile_manuscript() {
-    echo ""
-    echo "📁 Available book directories:"
+    echo "📃 ➡️  📖 Compile Existing Chapters into Manuscript"
+    echo
     
-    # Look for all types of book directories
-    OLD_BOOK_DIRS=($(ls -d ./book_outputs/book_outline_* 2>/dev/null))
-    NEW_BOOK_DIRS=($(ls -d ./book_outputs/*-[0-9]*_[0-9]* 2>/dev/null))
-    # Dynamic directories with sanitized topic names (format: topic-YYYYMMDD_HHMMSS)
-    TOPIC_DIRS=($(ls -d ./book_outputs/*-2*_*_* 2>/dev/null))
+    if ! get_book_dirs 1; then
+        echo
+        echo "❌ No books with chapters found to compile"
+        echo
+        echo "Press Enter to return to the main menu"
+        read -r
+        return
+    fi
     
-    declare -a ALL_BOOK_DIRS
+    echo
+    echo "Select a book to compile (or 0 to cancel):"
+    read -r selection
     
-    # Add old format directories
-    for dir in "${OLD_BOOK_DIRS[@]}"; do
-        ALL_BOOK_DIRS+=("$dir")
-    done
-    
-    # Add new format directories
-    for dir in "${NEW_BOOK_DIRS[@]}"; do
-        ALL_BOOK_DIRS+=("$dir")
-    done
-    
-    # Add topic-based dynamic directories
-    for dir in "${TOPIC_DIRS[@]}"; do
-        if [[ ! " ${ALL_BOOK_DIRS[*]} " =~ " ${dir} " ]]; then
-            ALL_BOOK_DIRS+=("$dir")
+    if [[ ! "$selection" =~ ^[0-9]+$ ]] || [ "$selection" -lt 1 ] || [ "$selection" -gt "${#book_dirs[@]}" ]; then
+        if [ "$selection" = "0" ]; then
+            echo "Operation canceled."
+            return
         fi
-    done
-    
-    if [ ${#ALL_BOOK_DIRS[@]} -eq 0 ]; then
-        echo "❌ No book directories found"
-        return 1
-    fi
-    
-    for i in "${!ALL_BOOK_DIRS[@]}"; do
-        DIR_NAME=$(basename "${ALL_BOOK_DIRS[$i]}")
-        CHAPTER_COUNT=$(ls "${ALL_BOOK_DIRS[$i]}"/chapter_*.md 2>/dev/null | wc -l)
-        echo "   $((i+1))) $DIR_NAME ($CHAPTER_COUNT chapters)"
-    done
-    
-    echo ""
-    read -p "Select directory (1-${#ALL_BOOK_DIRS[@]}): " dir_choice
-    
-    if [[ ! "$dir_choice" =~ ^[0-9]+$ ]] || [ "$dir_choice" -lt 1 ] || [ "$dir_choice" -gt "${#ALL_BOOK_DIRS[@]}" ]; then
         echo "❌ Invalid selection"
-        return 1
+        echo
+        echo "Press Enter to return to the main menu"
+        read -r
+        return
     fi
     
-    SELECTED_DIR="${ALL_BOOK_DIRS[$((dir_choice-1))]}"
+    selected_dir="${book_dirs[$selection]}"
+    book_name=$(basename "$selected_dir")
     
-    echo ""
-    echo "📄 Choose chapter version:"
-    echo "   1) Original chapters"
-    echo "   2) Edited chapters (if available)"
-    echo "   3) Final/Proofread chapters (if available)"
-    read -p "Choose version (1-3): " version_choice
+    echo
+    echo "� Compiling chapters from $book_name..."
+    echo
     
-    echo ""
-    echo "📄 Output format:"
-    echo "   1) Markdown (for KDP)"
-    echo "   2) HTML (for web)"
-    echo "   3) PDF (requires pandoc)"
-    read -p "Choose format (1-3): " format_choice
+    # Optional: Select compile format
+    echo "Select output format(s):"
+    echo "1) All formats (HTML, EPUB, PDF)"
+    echo "2) HTML only"
+    echo "3) EPUB only"
+    echo "4) PDF only"
+    echo
+    echo "Select format option (1-4):"
+    read -r format_choice
     
-    case $format_choice in
-        1) FORMAT="markdown" ;;
-        2) FORMAT="html" ;;
-        3) FORMAT="pdf" ;;
-        *) FORMAT="markdown" ;;
+    # Default flags
+    html_flag=""
+    epub_flag=""
+    pdf_flag=""
+    cover_flag=""
+    
+    # Check for cover image
+    if [ -f "$selected_dir/cover.png" ] || [ -f "$selected_dir/cover.jpg" ]; then
+        if [ -f "$selected_dir/cover.png" ]; then
+            cover_path="$selected_dir/cover.png"
+        else
+            cover_path="$selected_dir/cover.jpg"
+        fi
+        cover_flag="--add-cover $cover_path"
+        echo "✅ Found cover image: $cover_path"
+    fi
+    
+    case "$format_choice" in
+        1)
+            ;;
+        2)
+            html_flag="--html"
+            ;;
+        3)
+            epub_flag="--epub"
+            ;;
+        4)
+            pdf_flag="--pdf"
+            ;;
+        *)
+            echo "❌ Invalid choice, defaulting to all formats"
+            html_flag="--html"
+            epub_flag="--epub"
+            pdf_flag="--pdf"
+            ;;
     esac
     
-    loading_dots 2 "Preparing compilation"
-    ./compile_book.sh "$SELECTED_DIR" "$FORMAT" "$version_choice"
+    # Run compile script with the specific book directory
+    echo "📖 Running compile script..."
+    if ./compile_book.sh "$selected_dir" $html_flag $epub_flag $pdf_flag $cover_flag; then
+        echo "✅ Compilation complete"
+        
+        # Show generated files
+        echo
+        echo "📚 Generated files:"
+        if [ -n "$html_flag" ] && [ -f "$selected_dir/book.html" ]; then
+            echo "  - HTML: $selected_dir/book.html"
+        fi
+        if [ -n "$epub_flag" ] && [ -f "$selected_dir/book.epub" ]; then
+            echo "  - EPUB: $selected_dir/book.epub"
+        fi
+        if [ -n "$pdf_flag" ] && [ -f "$selected_dir/book.pdf" ]; then
+            echo "  - PDF: $selected_dir/book.pdf"
+        fi
+    else
+        echo "❌ Compilation failed"
+    fi
+    
+    echo
+    echo "Press Enter to return to the main menu"
+    read -r
 }
 
 # Enhanced suggest_topics function that returns parameters for book generation

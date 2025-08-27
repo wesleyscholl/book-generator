@@ -332,13 +332,13 @@ for f in "$SEEN_DIR"/*.json; do
   mla=$(jq -r '.citation_mla // empty' "$f")
   summary=$(jq -r '.summary // empty' "$f")
 
-  echo "## $count. $title" >> "$FINAL_MD"
+  echo "#### $count. $title" >> "$FINAL_MD"
   [ -n "$authors" ] && echo "- **Authors:** $authors" >> "$FINAL_MD"
   [ -n "$pub" ] && echo "- **Publisher:** $pub" >> "$FINAL_MD"
   [ -n "$datep" ] && echo "- **Date:** $datep" >> "$FINAL_MD"
   [ -n "$url" ] && echo "- **URL:** $url" >> "$FINAL_MD"
   [ -n "$doi" ] && [ "$doi" != "n/a" ] && [ "$doi" != "N/A" ] && [ "$doi" != "" ] && echo "- **DOI:** $doi" >> "$FINAL_MD"
-  [ -n "$summary" ] && echo "- **Summary:** $summary" >> "$FINAL_MD"
+#   [ -n "$summary" ] && echo "- **Summary:** $summary" >> "$FINAL_MD"
   if [ -n "$apa" ] || [ -n "$mla" ]; then
     echo "- **Citations:**" >> "$FINAL_MD"
     [ -n "$apa" ] && echo "  - APA: $apa" >> "$FINAL_MD"

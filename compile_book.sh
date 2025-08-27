@@ -254,6 +254,37 @@ generate_book_cover() {
         fi
     fi
 
+    # Check for author photo
+    local author_photo_path="$SCRIPT_DIR/author-photo.png"
+    local author_photo_exports_path="${assets_dir}/author-photo.png"
+
+    if [ -f "$author_photo_path" ]; then
+        # Copy author photo to exports directory
+        cp "$author_photo_path" "$author_photo_exports_path"
+    else
+        # Check in current directory
+        if [ -f "author-photo.png" ]; then
+            cp "author-photo.png" "$author_photo_exports_path"
+        else
+            echo "⚠️ Author photo not found, creating a placeholder"
+            # Create a placeholder author photo
+            $img_cmd -size 300x300 xc:white -gravity center \
+                -pointsize 24 -fill black -annotate +0+0 "Author Photo" \
+                "$author_photo_exports_path"
+        fi
+    fi
+
+    # Check in current directory
+    if [ -f "speedy-quick-publishing-logo.png" ]; then
+        cp "speedy-quick-publishing-logo.png" "$logo_exports_path"
+    else
+        echo "⚠️ Publisher logo not found, creating a placeholder"
+        # Create a placeholder logo
+        $img_cmd -size 300x100 xc:white -gravity center \
+            -pointsize 24 -fill black -annotate +0+0 "$PUBLISHER" \
+            "$logo_exports_path"
+    fi
+
     # Simple black & white cover generation (no external AI)
     # Ensure the publisher logo is placed in the exports dir and used on back/copyright pages
     local logo_basename="$(basename "$logo_exports_path")"
@@ -814,6 +845,13 @@ fi
 # Basename for referencing the logo in the manuscript and exports
 LOGO_BASENAME="$(basename "$PUBLISHER_LOGO_SRC")"
 
+# Copy author photo into exports dir for inclusion in manuscript
+AUTHOR_PHOTO_SRC="$SCRIPT_DIR/author-photo.png"
+if [ -f "$AUTHOR_PHOTO_SRC" ]; then
+    cp -f "$AUTHOR_PHOTO_SRC" "$EXPORTS_DIR/$(basename "$AUTHOR_PHOTO_SRC")" 2>/dev/null || true
+fi
+AUTHOR_PHOTO_BASENAME="$(basename "$AUTHOR_PHOTO_SRC")"
+
 echo "📑 Creating manuscript: $(basename "$MANUSCRIPT_FILE")"
 
 # Generate random author pen name if requested
@@ -1224,8 +1262,6 @@ else
     echo "ℹ️ No generated bibliography found at $BIB_FILE"
 fi
 
-AUTHOR_PHOTO="$(realpath "$BOOK_DIR/author-photo.png")"
-
 cat << EOF >> "$MANUSCRIPT_FILE"
 \pagebreak
 
@@ -1234,10 +1270,10 @@ cat << EOF >> "$MANUSCRIPT_FILE"
 EOF
 
 # Insert image using raw LaTeX if it exists
-if [ -f "$AUTHOR_PHOTO" ]; then
+if [ -f "$AUTHOR_PHOTO_BASENAME" ]; then
   cat << EOF >> "$MANUSCRIPT_FILE"
 
-\includegraphics[width=0.5\\textwidth]{$AUTHOR_PHOTO}
+\includegraphics[width=0.5\\textwidth]{$AUTHOR_PHOTO_BASENAME}
 
 EOF
 fi
