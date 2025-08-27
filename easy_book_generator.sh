@@ -132,7 +132,7 @@ show_interactive_menu() {
 ╚══════════════════════════════════════════════════════════╝
 EOF
     
-    typewriter "Complete Workflow Automation" 0.03
+    typewriter "Complete Workflow Automation" 0.02
     echo
     
     cat << 'EOF'
@@ -143,12 +143,13 @@ Choose your workflow:
 3) ✍️  Generate Chapters from Existing Outline
 4) 📖 Compile Existing Chapters into Manuscript
 5) ✨ Review & Edit Existing Book
-6) ⚙️  Configure Settings
-7) ❓ Help & Examples
-8) 🚪 Exit
+6) 🧾 Generate References for a Book
+7) ⚙️  Configure Settings
+8) ❓ Help & Examples
+9) 🚪 Exit
 
 EOF
-    echo -n "Select option (1-8): "
+    echo -n "Select option (1-9): "
 }
 
 configure_settings() {
@@ -157,7 +158,7 @@ configure_settings() {
     echo "   API Key: ${GEMINI_API_KEY:+Set}${GEMINI_API_KEY:-Not Set}"
     echo "   Model: ${BOOK_MODEL:-gemini-1.5-flash-latest}"
     echo "   Temperature: ${BOOK_TEMPERATURE:-0.8}"
-    echo "   Words per chapter: ${BOOK_MIN_WORDS:-1000}-${BOOK_MAX_WORDS:-2000}"
+    echo "   Words per chapter: ${BOOK_MIN_WORDS:-2200}-${BOOK_MAX_WORDS:-2500}"
     echo "   Style: ${BOOK_STYLE:-detailed}"
     echo "   Tone: ${BOOK_TONE:-professional}"
     echo ""
@@ -626,7 +627,7 @@ generate_chapters_from_outline() {
                 fi
             else
                 # Other directory format
-                echo "   $((i+1))) $DIR_NAME ($CHAPTER_COUNT chapters)"
+                echo "   $((i+1))) 📚 $DIR_NAME ($CHAPTER_COUNT chapters)"
             fi
         else
             # Old format: standalone outline file
@@ -634,9 +635,9 @@ generate_chapters_from_outline() {
             TIMESTAMP=$(echo "$BASENAME" | grep -o '[0-9]\{8\}_[0-9]\{6\}')
             if [ -n "$TIMESTAMP" ]; then
                 FORMATTED_DATE=$(date -r "$OUTLINE_PATH" "+%Y-%m-%d %H:%M" 2>/dev/null || echo "$TIMESTAMP")
-                echo "   $((i+1))) $BASENAME (Created: $FORMATTED_DATE)"
+                echo "   $((i+1))) 📝 $BASENAME (Created: $FORMATTED_DATE)"
             else
-                echo "   $((i+1))) $BASENAME"
+                echo "   $((i+1))) 📝 $BASENAME"
             fi
         fi
     done
@@ -683,6 +684,58 @@ generate_chapters_from_outline() {
             ./compile_book.sh "$BOOK_DIR"
         fi
     fi
+}
+
+generate_references_menu() {
+    echo ""
+    echo "📁 Available book directories for references generation:"
+
+    # Collect candidate directories (same logic used elsewhere)
+    DIRS=()
+    if [ -d "./book_outputs" ]; then
+        for d in ./book_outputs/*/; do
+            [ -d "$d" ] || continue
+            DIRS+=("$d")
+        done
+    fi
+
+    if [ ${#DIRS[@]} -eq 0 ]; then
+        echo "❌ No book directories found in ./book_outputs"
+        return 1
+    fi
+
+    for i in "${!DIRS[@]}"; do
+        name=$(basename "${DIRS[$i]}")
+        count=$(ls "${DIRS[$i]}"/chapter_*.md 2>/dev/null | wc -l)
+        if [ "$count" -eq 0 ]; then
+            echo "   $((i+1))) 📑 $name (no chapters)"
+        elif [ "$count" -eq 1 ]; then
+            echo "   $((i+1))) 📚 $name (1 chapter)"
+        else
+            echo "   $((i+1))) 📚 $name ($count chapters)"
+        fi
+    done
+
+    echo ""
+    read -p "Select directory (1-${#DIRS[@]}): " choice
+    if [[ ! "$choice" =~ ^[0-9]+$ ]] || [ "$choice" -lt 1 ] || [ "$choice" -gt "${#DIRS[@]}" ]; then
+        echo "❌ Invalid selection"
+        return 1
+    fi
+
+    SELECTED_DIR="${DIRS[$((choice-1))]}"
+    echo "Selected: $(basename "$SELECTED_DIR")"
+    read -p "Batch size for Gemini calls (default 2): " batch
+    batch=${batch:-2}
+
+    if [ ! -f "./generate_references.sh" ]; then
+        echo "❌ generate_references.sh not found in current directory"
+        return 1
+    fi
+
+    chmod +x ./generate_references.sh
+    echo "🔗 Invoking generate_references.sh on $SELECTED_DIR with batch size $batch"
+    ./generate_references.sh "$SELECTED_DIR" "$batch"
 }
 
 review_and_edit_book() {
@@ -845,7 +898,7 @@ edit_chapter() {
 - Strengthening character development and dialogue
 - Adding more vivid descriptions where appropriate
 - Maintaining the original story and voice
-- Ensuring 1000-2000 word length
+- Ensuring 2200-2500 word length
 
 Rewrite the chapter with these improvements:
 
@@ -1279,12 +1332,18 @@ main() {
                 read -p "Press Enter to continue..."
                 ;;
             6)
-                configure_settings
+                generate_references_menu
+                read -p "Press Enter to continue..."
                 ;;
             7)
-                show_help
+                configure_settings
+                read -p "Press Enter to continue..."
                 ;;
             8)
+                show_help
+                read -p "Press Enter to continue..."
+                ;;
+            9)
                 # Calculate and display elapsed time before exiting
                 END_TIME=$(date +%s)
                 ELAPSED_TIME=$((END_TIME - START_TIME))
@@ -1298,7 +1357,7 @@ main() {
                 exit 0
                 ;;
             *)
-                echo "❌ Invalid option. Please choose 1-8."
+                echo "❌ Invalid option. Please choose 1-9."
                 sleep 2
                 ;;
         esac

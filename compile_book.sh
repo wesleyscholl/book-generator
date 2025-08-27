@@ -143,7 +143,6 @@ title: false
 identifier:
   - scheme: ISBN
     text: "${ISBN:-[No ISBN Provided]}"
-classoption: openany
 header-includes:
   - \usepackage{titlesec}
   - \titleformat{\section}[block]{\bfseries\Huge\centering}{}{0pt}{}
@@ -152,7 +151,7 @@ header-includes:
   - \renewcommand{\chapterbreak}{\clearpage}
   
 $([ -n "$cover_basename" ] && echo "cover-image: \"$cover_basename\"")
-...
+---
 EOF
 
     echo "$metadata_file"
@@ -893,12 +892,25 @@ header-includes:
 \thispagestyle{empty}
 \clearpage\vspace*{\fill}
 
-# $BOOK_TITLE {.unnumbered .unlisted}
-## $SUB_TITLE {.unnumbered .unlisted}
+\begin{center}
+{\fontsize{28}{32}\selectfont\bfseries $BOOK_TITLE}
+\end{center}
+
+\vspace{4em}
+
+\begin{center}
+{\fontsize{20}{24}\selectfont\bfseries $SUB_TITLE}
+\end{center}
+
 \vspace{12em}
 
-### By $AUTHOR {.unnumbered .unlisted}
-### © $PUBLICATION_YEAR {.unnumbered .unlisted}
+\begin{center}
+{\fontsize{14}{18}\selectfont\bfseries By $AUTHOR}
+\end{center}
+
+\begin{center}
+{\normalsize © $PUBLICATION_YEAR}
+\end{center}
 
 \centering
 $(if [ -f "$EXPORTS_DIR/$LOGO_BASENAME" ]; then echo "![]($LOGO_BASENAME){ width=40% } "; fi)
@@ -923,7 +935,7 @@ All rights reserved. No part of this publication may be reproduced, distributed,
 
 \clearpage
 
-\setcounter{tocdepth}{2}
+\setcounter{tocdepth}{1}
 \tableofcontents
 
 \clearpage
@@ -936,34 +948,6 @@ EOF
 echo ""
 echo "📖 Assembling chapters into manuscript..."
 echo ""
-
-# If a front cover image exists, insert it immediately after the YAML front-matter
-# (after the second '---') so header-includes remain in the preamble and PDF builds correctly.
-if [ -n "$COVER_IMAGE" ] && [ -f "$COVER_IMAGE" ]; then
-    echo "🖼️ Embedding front cover into manuscript (after YAML front-matter): $(basename "$COVER_IMAGE")"
-    TMP_MANUSCRIPT="$(mktemp)"
-    COVER_BASENAME="$(basename "$COVER_IMAGE")"
-
-    # Insert the cover after the second '---' which closes the YAML metadata block
-    awk -v coverfile="$COVER_BASENAME" '
-    BEGIN { count=0; inserted=0 }
-    {
-        print $0
-        if ($0 == "---") {
-            count++
-            if (count == 2 && !inserted) {
-                # Insert cover markup and a page break
-                print "\\thispagestyle{empty}"
-                print "![](" coverfile "){ width=100% }"
-                print "\\clearpage"
-                inserted=1
-            }
-        }
-    }
-    ' "$MANUSCRIPT_FILE" > "$TMP_MANUSCRIPT"
-
-    mv "$TMP_MANUSCRIPT" "$MANUSCRIPT_FILE"
-fi
 
 TOTAL_WORDS=0
 CHAPTER_COUNTER=0
@@ -1014,10 +998,10 @@ for CHAPTER_FILE in "${CHAPTER_FILES[@]}"; do
         CHAPTER_SUBTITLE=$(echo "$CLEAN_CHAPTER_TITLE" | cut -d: -f2- | sed 's/^ *//; s/ *$//')
 
         # H1: chapter anchor/title (keeps numbering for TOC)
-        echo "# Chapter $CHAPTER_NUM {.unnumbered}" >> "$MANUSCRIPT_FILE"
+        echo "## Chapter $CHAPTER_NUM {.unnumbered .unlisted}" >> "$MANUSCRIPT_FILE"
         echo "" >> "$MANUSCRIPT_FILE"
         # H2: actual chapter title
-        echo "## $CHAPTER_MAIN_TITLE {.chapter-main-title}" >> "$MANUSCRIPT_FILE"
+        echo "# $CHAPTER_MAIN_TITLE {.chapter-main-title}" >> "$MANUSCRIPT_FILE"
         # H3: subtitle (optional)
         if [ -n "$CHAPTER_SUBTITLE" ]; then
             echo "" >> "$MANUSCRIPT_FILE"
@@ -1217,14 +1201,62 @@ EOF
 
 # Add a simple end note to the manuscript instead
 cat << EOF >> "$MANUSCRIPT_FILE"
-\newpage
-\section{End}
----
+\pagebreak
+
+\vspace{10cm}
+\begin{center}
+\textnormal{---------------------------------------------}
+\end{center}
 \begin{center}
 \textit{Copyright © $PUBLICATION_YEAR $AUTHOR. All rights reserved.}
+\end{center}
+\begin{center}
 \textit{Published by $PUBLISHER}
 \end{center}
 EOF
+
+# If a generated bibliography exists (from generate_references.sh), append it here
+BIB_FILE="$BOOK_DIR/final_bibliography.md"
+if [ -f "$BIB_FILE" ]; then
+    # Copy the original bibliography into the exports directory for convenience
+    cp -f "$BIB_FILE" "$EXPORTS_DIR/" 2>/dev/null || true
+else
+    echo "ℹ️ No generated bibliography found at $BIB_FILE"
+fi
+
+AUTHOR_PHOTO="$(realpath "$BOOK_DIR/author-photo.png")"
+
+cat << EOF >> "$MANUSCRIPT_FILE"
+\pagebreak
+
+## Author Bio {.unlisted .unnumbered}
+
+EOF
+
+# Insert image using raw LaTeX if it exists
+if [ -f "$AUTHOR_PHOTO" ]; then
+  cat << EOF >> "$MANUSCRIPT_FILE"
+
+\includegraphics[width=0.5\\textwidth]{$AUTHOR_PHOTO}
+
+EOF
+fi
+
+cat << EOF >> "$MANUSCRIPT_FILE"
+\vspace{1cm}
+
+Elara Morgan is a passionate non-fiction author dedicated to exploring the intricacies of human experience and the world around us. With a keen eye for detail and a talent for making complex topics accessible, Elara's writing invites readers on a journey of discovery. When she's not immersed in research or crafting her next book, Elara enjoys hiking, gardening, and spending time with her family in Portsmouth, New Hampshire.
+
+\vspace{2cm}
+
+\pagebreak
+\begin{center}
+\section{References}
+\vspace{2cm}
+\end{center}
+EOF
+
+cat "$BIB_FILE" >> "$MANUSCRIPT_FILE"
 
 # If a back cover was generated, include it as the final page
 if [ -n "$BACK_COVER" ] && [ -f "$BACK_COVER" ]; then
@@ -1243,6 +1275,15 @@ celebration "Manuscript Complete!"
 echo "✅ Manuscript created: $(basename "$MANUSCRIPT_FILE")"
 echo "📊 Total words: $TOTAL_WORDS"
 echo "📄 Estimated pages: $((TOTAL_WORDS / 250))"
+
+# Optionally generate references if GEMINI API key is available
+# if [ -n "${GEMINI_API_KEY:-}" ]; then
+#     echo "🔗 Generating references via generate_references.sh (Gemini)..."
+#     # Run in background so main compile doesn't block too long; user can disable by unsetting GEMINI_API_KEY
+#     "$SCRIPT_DIR/generate_references.sh" "$BOOK_DIR" 2>/dev/null &
+# else
+#     echo "ℹ️ To auto-generate references after compile, set GEMINI_API_KEY and re-run; or run generate_references.sh manually."
+# fi
 
 # Define CSS for HTML and EPUB formats
 BOOK_CSS="
@@ -1360,16 +1401,32 @@ generate_ebook_format() {
         pdf)
             output_file="${output_dir}/$(basename "$input_file" .md).pdf"
             echo "📄 Generating PDF format..."
+#             cover="$(basename "$COVER_IMAGE")"
+#             cat << EOF > "$EXPORTS_DIR/cover.tex"
+# \def\cover{$cover}
+# \usepackage{graphicx}
+# \usepackage{geometry}
+
+# \AtBeginDocument{%
+#   \thispagestyle{empty}
+#   \newgeometry{margin=0mm}
+#   \includegraphics[width=\paperwidth,height=\paperheight,keepaspectratio=false]{$cover}
+#   \restoregeometry
+#   \newpage
+# }
+# EOF
+
             cat << 'EOF' > "$EXPORTS_DIR/disable-title.tex"
 \renewcommand{\maketitle}{}
 \usepackage{titlesec}
-\titleformat{\section}{\centering\fontsize{28}{32}\selectfont\bfseries}{\thesection}{1em}{}
-\titleformat{\subsection}{\centering\fontsize{20}{24}\selectfont\bfseries}{\thesubsection}{1em}{}
-\titleformat{\subsubsection}{\centering\fontsize{14}{18}\selectfont\bfseries}{\thesubsubsection}{1em}{}
+\titleformat{\section}{\fontsize{28}{32}\selectfont\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}{\fontsize{20}{24}\selectfont\bfseries}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}{\fontsize{14}{18}\selectfont\bfseries}{\thesubsubsection}{1em}{}
 EOF
-
+            # -H cover.tex \
             # Try direct PDF generation first (simplest approach)
-            (cd "$output_dir" && pandoc -f markdown -t pdf --pdf-engine=lualatex \
+            (cd "$output_dir" && pandoc -f markdown -t pdf \
+                --pdf-engine=lualatex \
                 --metadata-file="$(basename "$metadata")" \
                 -H disable-title.tex \
                 -o "$(basename "$output_file")" "$(basename "$input_file")") && {

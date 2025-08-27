@@ -26,8 +26,8 @@ calculate_chapter_extension_tokens() {
 # Function to review and process chapter based on length
 process_chapter_by_length() {
     local chapter_file="$1"
-    local min_words="${2:-500}"
-    local max_words="${3:-1000}"
+    local min_words="${2:-2200}"
+    local max_words="${3:-2500}"
     
     # Get current word count
     local current_word_count=$(wc -w < "$chapter_file" | tr -d ' ')

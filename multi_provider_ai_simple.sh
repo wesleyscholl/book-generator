@@ -920,7 +920,7 @@ test_all_providers() {
 
 estimate_book_cost() {
     local num_chapters="${1:-12}"
-    local words_per_chapter="${2:-1000}"
+    local words_per_chapter="${2:-2200}"
     
     echo "💰 Estimated Book Generation Cost:"
     echo "   Chapters: $num_chapters"
@@ -948,7 +948,7 @@ main() {
             show_provider_status
             ;;
         "estimate")
-            estimate_book_cost "${2:-12}" "${3:-1000}"
+            estimate_book_cost "${2:-12}" "${3:-2200}"
             ;;
         *)
             echo "Multi-Provider AI System for Book Generation"

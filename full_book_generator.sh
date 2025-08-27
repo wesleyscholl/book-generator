@@ -91,13 +91,13 @@ select_task_model() {
 # Default configuration
 API_KEY="${GEMINI_API_KEY}"
 MODEL="gemini-1.5-flash-latest"
-TEMPERATURE=0.95
+TEMPERATURE=0.8
 TOP_K=40
 TOP_P=0.9
 MAX_TOKENS=8192
 MAX_RETRIES=1
-MIN_WORDS=1000
-MAX_WORDS=2000
+MIN_WORDS=2200
+MAX_WORDS=2500
 WRITING_STYLE="detailed"
 TONE="professional"
 DELAY_BETWEEN_CHAPTERS=60  # Seconds to avoid rate limits
@@ -126,8 +126,8 @@ REQUIRED ARGUMENTS:
 OPTIONS:
     -m, --model MODEL           Gemini model (flash-latest, pro-latest)
     -t, --temperature TEMP      Temperature 0.0-1.0 (default: 0.8)
-    --min-words WORDS          Minimum words per chapter (default: 1000)
-    --max-words WORDS          Maximum words per chapter (default: 2000)
+    --min-words WORDS          Minimum words per chapter (default: 2200)
+    --max-words WORDS          Maximum words per chapter (default: 2500)
     --style STYLE              Writing style: detailed|narrative|academic
     --tone TONE                Tone: professional|casual|authoritative
     --preset PRESET            Use preset: creative|technical|fiction|business
@@ -804,11 +804,11 @@ check_rate_limits() {
     # Instead we provide a helper that appends continuation text until min words are reached.
 
 # Function to calculate tokens required for chapter extension based on the formula
-# Formula: MAX_TOKENS = (1000 minimum word length * 1.25) - (current chapter word length * 1.25) 
+# Formula: MAX_TOKENS = (2200 minimum word length * 1.25) - (current chapter word length * 1.25) 
 #          + (system prompt word length * 1.25) + (user prompt word length * 1.25) + 250
 calculate_chapter_extension_tokens() {
     local current_words="$1"
-    local min_words="${2:-1000}"
+    local min_words="${2:-2200}"
     local system_prompt_words="${3:-50}"  # Estimated system prompt length
     local user_prompt_words="${4:-200}"   # Estimated user prompt length
     
@@ -939,7 +939,7 @@ Rewrite with more unique examples and phrasing." > "$plagiarism_report"
     if [ "$word_count_ok" = "false" ]; then
         word_count_instruction="IMPORTANT WORD COUNT REQUIREMENT:
 - Current chapter is only $current_word_count words
-- MUST expand to at least 1000 words, preferably 1000-2000 words
+- MUST expand to at least 2200 words, preferably 2200-2500 words
 - Add more examples, detailed explanations, and practical applications
 - Elaborate on each concept with more depth
 - Do not use filler or fluff - all content must be valuable and substantive"
@@ -958,7 +958,7 @@ REWRITING REQUIREMENTS:
 2. Use original examples, analogies, and explanations
 3. Maintain the same chapter structure and key points
 4. Ensure 100% original content with unique voice
-5. Target 1000-2000 words
+5. Target 2200-2500 words
 6. Use different sentence structures and vocabulary
 7. Create original case studies, examples, and scenarios
 8. Avoid any potentially copyrighted expressions or concepts
@@ -1672,18 +1672,12 @@ KEY CONCEPTS:
 4. [Concept 4]: [Brief definition]
 5. [Concept 5]: [Brief definition]
 
-WORD COUNT DISTRIBUTION:
-- Introduction: 800-1000 words
-- Each chapter: 1200-1500 words
-- Conclusion: 800-1000 words
-- Total: approximately 20,000-25,000 words
-
 IMPORTANT: Replace all bracketed placeholders with actual content. Use markdown headings exactly as shown (# for title, ## for subtitle, ### for chapters). Include EXACTLY 15 chapters."
 
 
     echo "Debug: USER_PROMPT for outline generation:" > debug.log
     echo "$USER_PROMPT" >> debug.log
-    typewriter "Preparing to generate your book outline..." 0.05 "🧠 "
+    typewriter "Preparing to generate your book outline..." 0.03 "🧠 "
     
     
     # Use smart_api_call directly instead of complex JSON payload construction
@@ -1925,7 +1919,7 @@ OUTLINE_CONTENT=$(cat "$OUTLINE_FILE")
 TOTAL_WORDS=0
 
 # System prompt for chapter generation
-CHAPTER_SYSTEM_PROMPT="You are a professional book author. Write immersive, narrative-driven chapters in flowing long-form prose, not lists or fragments. Use vivid, descriptive language that creates strong imagery and emotional connection, with consistent pacing throughout. Always produce only final, publication-ready text — no meta notes, commentary, outlines, separators, or annotations. Include markdown formatting for titles, subtitles, headings, and subheadings."
+CHAPTER_SYSTEM_PROMPT="You are a professional book author renowned for writing immersive, narrative-driven chapters. Your expertise lies in crafting flowing, long-form prose that is rich with vivid, descriptive language. You are a master of consistent pacing, emotional depth, and strong imagery. Your final output must always be publication-ready text, free of any meta notes, commentary, outlines, or annotations. Write each chapter to a minimum of 2200 words. Utilize markdown for all titles, subheadings, and formatting."
 
 # Store chapters in an array to avoid pipe issues
 echo "DEBUG: Preparing to process chapters" >> debug.log
@@ -2028,37 +2022,34 @@ OUTLINE_CONTENT=$(echo "$OUTLINE_CONTENT" | sed 's/\*\*//g')
 
 # Create new loop, to extend generate more to the chapter file and join both to meet the minimum word count
 
-CHAPTER_USER_PROMPT="Write Chapter ${CHAPTER_NUM}: '${CHAPTER_TITLE}'
+CHAPTER_USER_PROMPT="Write Chapter ${CHAPTER_NUM}: '${CHAPTER_TITLE}'.
 
 CONTEXT:
-- Outline: ${OUTLINE_CONTENT}
-- Previous Chapters: ${EXISTING_CHAPTERS}
+- **Book Outline:** The book explores the power of play-based learning. This chapter, '${CHAPTER_TITLE}', challenges the misconception that play is frivolous, arguing it is a foundational, brain-building activity. It should transition from a critique of modern societal views to a deep exploration of the profound learning embedded in simple play, setting up the scientific explanations in the next chapter.
+- **Previous Chapters:** ${EXISTING_CHAPTERS}
 
 REQUIREMENTS:
-- Length: ${MIN_WORDS}-${MAX_WORDS} words (≥ ${MIN_WORDS})
-- Style: ${WRITING_STYLE}; Tone: ${TONE}
-${STYLE_INSTRUCTIONS}
-${TONE_INSTRUCTIONS}
-- Original text only. Attribute if quoting.
-- Start with:
-# Chapter ${CHAPTER_NUM}  
-## ${CHAPTER_TITLE}
+- **Length:** Strive for 2200-2500 words. Prioritize reaching at least 2200 words.
+- **Style & Tone:** Adopt a compelling, narrative-driven style and an encouraging, authoritative tone. The writing should feel like a trusted mentor guiding the reader.
+- **Expansion Focus:** For each example of play (e.g., arranging stones, building a fort, imaginary friends), dedicate significant space (at least 3-4 paragraphs) to fully expand on the cognitive, emotional, social, and physical benefits. Elaborate on the "why" and "how" of the learning process within these simple scenarios.
+- **Narrative Depth:** Weave in relatable anecdotes and scenarios that emotionally connect with the reader. Use vivid language and sensory details to bring the examples to life.
+- **Originality:** Ensure the text is original and avoid plagiarism.
+- **Structure:**
+    - **Strong Opening:** Begin with an engaging hook that challenges the reader's preconceived notions.
+    - **Main Sections:** Dedicate distinct, well-developed sections for each key idea (the paradox of preparation, the neuroscience of play, the prepared environment).
+    - **Transitions:** Ensure seamless transitions between sections and ideas.
+    - **Reflective Conclusion:** End with a powerful, reflective summary that re-emphasizes the chapter's core message and smoothly leads into the next chapter on the science of play.
 
 OUTPUT:
-- Return only the narrative.
-- No meta, notes, restating, or 'Conclusion'.
-- 90%+ paragraphs; ≤1 list.
-- ≤5 bolded words/phrases.
-- 4-5 subheadings max, distinct from title.
-- Use markdown (headings/subheadings).
-- No extraneous \n, no bibliography.
+- **Format:** Final, publication-ready prose only. No meta-notes, outlines, or 'Conclusion' labels.
+- **Content:** The output should be 90% or more long-form paragraphs. Limit the use of lists to one or fewer.
+- **Formatting:** Use markdown headings (##, ###) for chapter title and subheadings. Use **bold** for emphasis sparingly (limit to 5 phrases or fewer).
+- **Final Output Only:** Return only the narrative content.
+- **Start with:**
+# Chapter ${CHAPTER_NUM}
+## ${CHAPTER_TITLE}
 
-STRUCTURE:
-- Strong opening hook.
-- Vivid detail, smooth flow, full expansions.
-- Natural transitions between sections.
-- Reflective ending leading into next chapter.
-- Subsections in markdown (###, ####, or **bold**)."
+- **Do not exceed 2500 words.**"
 
     # STREAMLINED CHAPTER GENERATION WORKFLOW
     # Step 1: Generate initial chapter
@@ -2190,7 +2181,7 @@ STRUCTURE:
         if [ "$FINAL_WORD_COUNT" -lt "$MIN_WORDS" ]; then
             echo "⚠️ Final version still below minimum word count. Adding more content..."
             append_until_min_words "$CHAPTER_FILE" "$MIN_WORDS"
-        elif [ "$FINAL_WORD_COUNT" -ge 1000 ]; then
+        elif [ "$FINAL_WORD_COUNT" -ge 2200 ]; then
             echo "✅ Chapter meets minimum length requirements, reviewing for quality..."
             # Simple review without the optimized handler
             REVIEW_PROMPT="Review and improve this chapter for quality without changing its length significantly."
