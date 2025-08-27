@@ -248,8 +248,8 @@ function smart_api_call() {
 # Model array format: "model_name:RPM:TPM:RPD"
 GEMINI_MODELS=(
     # Gemini 2.5 models (newest, try these first)
-    "gemini-2.5-pro:5:250000:100"
-    "gemini-2.5-flash:10:250000:250"
+    # "gemini-2.5-pro:5:250000:100"
+    # "gemini-2.5-flash:10:250000:250"
     "gemini-2.5-flash-lite:15:250000:1000"
     # Gemini 2.0 models
     "gemini-2.0-flash:15:1000000:200"

@@ -13,3 +13,748 @@ DEBUG: Skipping final draft step
 DEBUG: Copying original outline to final draft file: ./book_outputs/conquering-chronic-pain-20250825_115849/book_outline_final.md
 DEBUG: File copy operation returned: 0
 DEBUG: Original outline copied successfully to final draft
+Debug: Arguments passed:    --chapters-only ./book_outputs/the-playful-path-unlocking-your-childs-potential-through-joyful-play-based-learning-for-ages-3-8-20250827_104338//book_outline_reviewed.md
+Debug: OUTLINE_ONLY is set to: false
+Debug: OUTLINE_CONTENT in --chapters-only mode:
+BOOK TITLE: The Playful Path
+SUBTITLE: Unlocking Your Child's Potential Through Joyful, Play-Based Learning for Ages 3-8
+
+SUMMARY:
+This book empowers parents to embrace play as the most powerful vehicle for their child's holistic development and learning. It demystifies play-based learning, offering practical strategies and a clear framework to foster curiosity, critical thinking, and social-emotional intelligence through engaging, child-led experiences. Discover how to create an environment where learning flourishes naturally, preparing your child not just for school, but for a lifetime of joyful discovery.
+
+THEMES:
+1. Play as the primary mode of learning and development for young children.
+2. Empowering parents to be responsive facilitators, not just instructors, in their child's learning journey.
+3. Fostering holistic child development encompassing cognitive, social, emotional, and physical domains.
+Debug: Starting final draft step with OUTLINE_CONTENT:
+BOOK TITLE: The Playful Path
+SUBTITLE: Unlocking Your Child's Potential Through Joyful, Play-Based Learning for Ages 3-8
+
+SUMMARY:
+This book empowers parents to embrace play as the most powerful vehicle for their child's holistic development and learning. It demystifies play-based learning, offering practical strategies and a clear framework to foster curiosity, critical thinking, and social-emotional intelligence through engaging, child-led experiences. Discover how to create an environment where learning flourishes naturally, preparing your child not just for school, but for a lifetime of joyful discovery.
+
+THEMES:
+1. Play as the primary mode of learning and development for young children.
+2. Empowering parents to be responsive facilitators, not just instructors, in their child's learning journey.
+3. Fostering holistic child development encompassing cognitive, social, emotional, and physical domains.
+DEBUG: Preparing to process chapters
+DEBUG: Found 15 chapters to process
+DEBUG: Starting processing for chapter 1
+Debug: Collecting existing chapter 1 for context
+Debug: Collecting existing chapter 0 for context
+Debug: Getting style and tone instructions for chapter 1
+Debug: Getting style instructions for chapter 1
+DEBUG: Error at line 1952: Command "multi_check_plagiarism "$CHAPTER_FILE" > /dev/null 2>&1" exited with status 127
+DEBUG: Error at line 1952: Command "local jitter=$((RANDOM % 5))" exited with status 1
+DEBUG: Starting processing for chapter 2
+Debug: Collecting existing chapter 1 for context
+Debug: Getting style and tone instructions for chapter 2
+Debug: Getting style instructions for chapter 2
+DEBUG: Error at line 1952: Command "multi_check_plagiarism "$CHAPTER_FILE" > /dev/null 2>&1" exited with status 127
+DEBUG: Error at line 1952: Command "local jitter=$((RANDOM % 5))" exited with status 1
+DEBUG: Starting processing for chapter 3
+Debug: Collecting existing chapter 1 for context
+Debug: Collecting existing chapter 2 for context
+Debug: Getting style and tone instructions for chapter 3
+Debug: Getting style instructions for chapter 3
+DEBUG: Error at line 1952: Command "multi_check_plagiarism "$CHAPTER_FILE" > /dev/null 2>&1" exited with status 127
+DEBUG: Error at line 1952: Command "local jitter=$((RANDOM % 5))" exited with status 1
+DEBUG: Starting processing for chapter 4
+Debug: Collecting existing chapter 1 for context
+Debug: Collecting existing chapter 2 for context
+Debug: Collecting existing chapter 3 for context
+Debug: Getting style and tone instructions for chapter 4
+Debug: Getting style instructions for chapter 4
+DEBUG: Error at line 1952: Command "multi_check_plagiarism "$CHAPTER_FILE" > /dev/null 2>&1" exited with status 127
+DEBUG: Error at line 1952: Command "local jitter=$((RANDOM % 5))" exited with status 1
+Debug: Arguments passed:    --chapters-only ./book_outputs/the-playful-path-unlocking-your-childs-potential-through-joyful-play-based-learning-for-ages-3-8-20250827_104338//book_outline_reviewed.md
+Debug: OUTLINE_ONLY is set to: false
+Debug: OUTLINE_CONTENT in --chapters-only mode:
+BOOK TITLE: The Playful Path
+SUBTITLE: Unlocking Your Child's Potential Through Joyful, Play-Based Learning for Ages 3-8
+
+SUMMARY:
+This book empowers parents to embrace play as the most powerful vehicle for their child's holistic development and learning. It demystifies play-based learning, offering practical strategies and a clear framework to foster curiosity, critical thinking, and social-emotional intelligence through engaging, child-led experiences. Discover how to create an environment where learning flourishes naturally, preparing your child not just for school, but for a lifetime of joyful discovery.
+
+THEMES:
+1. Play as the primary mode of learning and development for young children.
+2. Empowering parents to be responsive facilitators, not just instructors, in their child's learning journey.
+3. Fostering holistic child development encompassing cognitive, social, emotional, and physical domains.
+Debug: Starting final draft step with OUTLINE_CONTENT:
+BOOK TITLE: The Playful Path
+SUBTITLE: Unlocking Your Child's Potential Through Joyful, Play-Based Learning for Ages 3-8
+
+SUMMARY:
+This book empowers parents to embrace play as the most powerful vehicle for their child's holistic development and learning. It demystifies play-based learning, offering practical strategies and a clear framework to foster curiosity, critical thinking, and social-emotional intelligence through engaging, child-led experiences. Discover how to create an environment where learning flourishes naturally, preparing your child not just for school, but for a lifetime of joyful discovery.
+
+THEMES:
+1. Play as the primary mode of learning and development for young children.
+2. Empowering parents to be responsive facilitators, not just instructors, in their child's learning journey.
+3. Fostering holistic child development encompassing cognitive, social, emotional, and physical domains.
+DEBUG: Preparing to process chapters
+DEBUG: Found 15 chapters to process
+DEBUG: Starting processing for chapter 1
+ℹ️ Resuming from chapter: 5
+⏭️ Skipping Chapter 1 (already exists)
+DEBUG: Starting processing for chapter 2
+⏭️ Skipping Chapter 2 (already exists)
+DEBUG: Starting processing for chapter 3
+⏭️ Skipping Chapter 3 (already exists)
+DEBUG: Starting processing for chapter 4
+⏭️ Skipping Chapter 4 (already exists)
+DEBUG: Starting processing for chapter 5
+Debug: Collecting existing chapter 1 for context
+Debug: Collecting existing chapter 2 for context
+Debug: Collecting existing chapter 3 for context
+Debug: Collecting existing chapter 4 for context
+Debug: Getting style and tone instructions for chapter 5
+Debug: Getting style instructions for chapter 5
+DEBUG: Error at line 1952: Command "multi_check_plagiarism "$CHAPTER_FILE" > /dev/null 2>&1" exited with status 127
+DEBUG: Starting processing for chapter 6
+Debug: Collecting existing chapter 1 for context
+Debug: Collecting existing chapter 2 for context
+Debug: Collecting existing chapter 3 for context
+Debug: Collecting existing chapter 4 for context
+Debug: Collecting existing chapter 5 for context
+Debug: Getting style and tone instructions for chapter 6
+Debug: Getting style instructions for chapter 6
+Debug: Arguments passed:    --chapters-only ./book_outputs/the-playful-path-unlocking-your-childs-potential-through-joyful-play-based-learning-for-ages-3-8-20250827_104338//book_outline_reviewed.md
+Debug: OUTLINE_ONLY is set to: false
+Debug: OUTLINE_CONTENT in --chapters-only mode:
+BOOK TITLE: The Playful Path
+SUBTITLE: Unlocking Your Child's Potential Through Joyful, Play-Based Learning for Ages 3-8
+
+SUMMARY:
+This book empowers parents to embrace play as the most powerful vehicle for their child's holistic development and learning. It demystifies play-based learning, offering practical strategies and a clear framework to foster curiosity, critical thinking, and social-emotional intelligence through engaging, child-led experiences. Discover how to create an environment where learning flourishes naturally, preparing your child not just for school, but for a lifetime of joyful discovery.
+
+THEMES:
+1. Play as the primary mode of learning and development for young children.
+2. Empowering parents to be responsive facilitators, not just instructors, in their child's learning journey.
+3. Fostering holistic child development encompassing cognitive, social, emotional, and physical domains.
+Debug: Starting final draft step with OUTLINE_CONTENT:
+BOOK TITLE: The Playful Path
+SUBTITLE: Unlocking Your Child's Potential Through Joyful, Play-Based Learning for Ages 3-8
+
+SUMMARY:
+This book empowers parents to embrace play as the most powerful vehicle for their child's holistic development and learning. It demystifies play-based learning, offering practical strategies and a clear framework to foster curiosity, critical thinking, and social-emotional intelligence through engaging, child-led experiences. Discover how to create an environment where learning flourishes naturally, preparing your child not just for school, but for a lifetime of joyful discovery.
+
+THEMES:
+1. Play as the primary mode of learning and development for young children.
+2. Empowering parents to be responsive facilitators, not just instructors, in their child's learning journey.
+3. Fostering holistic child development encompassing cognitive, social, emotional, and physical domains.
+DEBUG: Preparing to process chapters
+DEBUG: Found 15 chapters to process
+DEBUG: Starting processing for chapter 1
+ℹ️ Resuming from chapter: 6
+⏭️ Skipping Chapter 1 (already exists)
+DEBUG: Starting processing for chapter 2
+⏭️ Skipping Chapter 2 (already exists)
+DEBUG: Starting processing for chapter 3
+⏭️ Skipping Chapter 3 (already exists)
+DEBUG: Starting processing for chapter 4
+⏭️ Skipping Chapter 4 (already exists)
+DEBUG: Starting processing for chapter 5
+⏭️ Skipping Chapter 5 (already exists)
+DEBUG: Starting processing for chapter 6
+Debug: Collecting existing chapter 1 for context
+Debug: Collecting existing chapter 2 for context
+Debug: Collecting existing chapter 3 for context
+Debug: Collecting existing chapter 4 for context
+Debug: Collecting existing chapter 5 for context
+Debug: Getting style and tone instructions for chapter 6
+Debug: Getting style instructions for chapter 6
+Debug: Arguments passed:    --chapters-only ./book_outputs/the-playful-path-unlocking-your-childs-potential-through-joyful-play-based-learning-for-ages-3-8-20250827_104338//book_outline_reviewed.md
+Debug: OUTLINE_ONLY is set to: false
+Debug: OUTLINE_CONTENT in --chapters-only mode:
+BOOK TITLE: The Playful Path
+SUBTITLE: Unlocking Your Child's Potential Through Joyful, Play-Based Learning for Ages 3-8
+
+SUMMARY:
+This book empowers parents to embrace play as the most powerful vehicle for their child's holistic development and learning. It demystifies play-based learning, offering practical strategies and a clear framework to foster curiosity, critical thinking, and social-emotional intelligence through engaging, child-led experiences. Discover how to create an environment where learning flourishes naturally, preparing your child not just for school, but for a lifetime of joyful discovery.
+
+THEMES:
+1. Play as the primary mode of learning and development for young children.
+2. Empowering parents to be responsive facilitators, not just instructors, in their child's learning journey.
+3. Fostering holistic child development encompassing cognitive, social, emotional, and physical domains.
+Debug: Starting final draft step with OUTLINE_CONTENT:
+BOOK TITLE: The Playful Path
+SUBTITLE: Unlocking Your Child's Potential Through Joyful, Play-Based Learning for Ages 3-8
+
+SUMMARY:
+This book empowers parents to embrace play as the most powerful vehicle for their child's holistic development and learning. It demystifies play-based learning, offering practical strategies and a clear framework to foster curiosity, critical thinking, and social-emotional intelligence through engaging, child-led experiences. Discover how to create an environment where learning flourishes naturally, preparing your child not just for school, but for a lifetime of joyful discovery.
+
+THEMES:
+1. Play as the primary mode of learning and development for young children.
+2. Empowering parents to be responsive facilitators, not just instructors, in their child's learning journey.
+3. Fostering holistic child development encompassing cognitive, social, emotional, and physical domains.
+DEBUG: Preparing to process chapters
+DEBUG: Found 15 chapters to process
+DEBUG: Starting processing for chapter 1
+ℹ️ Resuming from chapter: 6
+⏭️ Skipping Chapter 1 (already exists)
+DEBUG: Starting processing for chapter 2
+⏭️ Skipping Chapter 2 (already exists)
+DEBUG: Starting processing for chapter 3
+⏭️ Skipping Chapter 3 (already exists)
+DEBUG: Starting processing for chapter 4
+⏭️ Skipping Chapter 4 (already exists)
+DEBUG: Starting processing for chapter 5
+⏭️ Skipping Chapter 5 (already exists)
+DEBUG: Starting processing for chapter 6
+Debug: Including full content of last chapter 5 for context
+Debug: Getting style and tone instructions for chapter 6
+Debug: Getting style instructions for chapter 6
+DEBUG: Error at line 1952: Command "multi_check_plagiarism "$CHAPTER_FILE" > /dev/null 2>&1" exited with status 127
+DEBUG: Starting processing for chapter 7
+Debug: Including full content of last chapter 6 for context
+Debug: Getting style and tone instructions for chapter 7
+Debug: Getting style instructions for chapter 7
+Debug: Arguments passed:    --chapters-only ./book_outputs/the-playful-path-unlocking-your-childs-potential-through-joyful-play-based-learning-for-ages-3-8-20250827_104338//book_outline_reviewed.md
+Debug: OUTLINE_ONLY is set to: false
+Debug: OUTLINE_CONTENT in --chapters-only mode:
+BOOK TITLE: The Playful Path
+SUBTITLE: Unlocking Your Child's Potential Through Joyful, Play-Based Learning for Ages 3-8
+
+SUMMARY:
+This book empowers parents to embrace play as the most powerful vehicle for their child's holistic development and learning. It demystifies play-based learning, offering practical strategies and a clear framework to foster curiosity, critical thinking, and social-emotional intelligence through engaging, child-led experiences. Discover how to create an environment where learning flourishes naturally, preparing your child not just for school, but for a lifetime of joyful discovery.
+
+THEMES:
+1. Play as the primary mode of learning and development for young children.
+2. Empowering parents to be responsive facilitators, not just instructors, in their child's learning journey.
+3. Fostering holistic child development encompassing cognitive, social, emotional, and physical domains.
+Debug: Starting final draft step with OUTLINE_CONTENT:
+BOOK TITLE: The Playful Path
+SUBTITLE: Unlocking Your Child's Potential Through Joyful, Play-Based Learning for Ages 3-8
+
+SUMMARY:
+This book empowers parents to embrace play as the most powerful vehicle for their child's holistic development and learning. It demystifies play-based learning, offering practical strategies and a clear framework to foster curiosity, critical thinking, and social-emotional intelligence through engaging, child-led experiences. Discover how to create an environment where learning flourishes naturally, preparing your child not just for school, but for a lifetime of joyful discovery.
+
+THEMES:
+1. Play as the primary mode of learning and development for young children.
+2. Empowering parents to be responsive facilitators, not just instructors, in their child's learning journey.
+3. Fostering holistic child development encompassing cognitive, social, emotional, and physical domains.
+DEBUG: Preparing to process chapters
+DEBUG: Found 15 chapters to process
+DEBUG: Starting processing for chapter 1
+ℹ️ Resuming from chapter: 7
+⏭️ Skipping Chapter 1 (already exists)
+DEBUG: Starting processing for chapter 2
+⏭️ Skipping Chapter 2 (already exists)
+DEBUG: Starting processing for chapter 3
+⏭️ Skipping Chapter 3 (already exists)
+DEBUG: Starting processing for chapter 4
+⏭️ Skipping Chapter 4 (already exists)
+DEBUG: Starting processing for chapter 5
+⏭️ Skipping Chapter 5 (already exists)
+DEBUG: Starting processing for chapter 6
+⏭️ Skipping Chapter 6 (already exists)
+DEBUG: Starting processing for chapter 7
+Debug: Including full content of last chapter 6 for context
+Debug: Getting style and tone instructions for chapter 7
+Debug: Getting style instructions for chapter 7
+Debug: Arguments passed:    --chapters-only ./book_outputs/the-playful-path-unlocking-your-childs-potential-through-joyful-play-based-learning-for-ages-3-8-20250827_104338//book_outline_reviewed.md
+Debug: OUTLINE_ONLY is set to: false
+Debug: OUTLINE_CONTENT in --chapters-only mode:
+BOOK TITLE: The Playful Path
+SUBTITLE: Unlocking Your Child's Potential Through Joyful, Play-Based Learning for Ages 3-8
+
+SUMMARY:
+This book empowers parents to embrace play as the most powerful vehicle for their child's holistic development and learning. It demystifies play-based learning, offering practical strategies and a clear framework to foster curiosity, critical thinking, and social-emotional intelligence through engaging, child-led experiences. Discover how to create an environment where learning flourishes naturally, preparing your child not just for school, but for a lifetime of joyful discovery.
+
+THEMES:
+1. Play as the primary mode of learning and development for young children.
+2. Empowering parents to be responsive facilitators, not just instructors, in their child's learning journey.
+3. Fostering holistic child development encompassing cognitive, social, emotional, and physical domains.
+Debug: Starting final draft step with OUTLINE_CONTENT:
+BOOK TITLE: The Playful Path
+SUBTITLE: Unlocking Your Child's Potential Through Joyful, Play-Based Learning for Ages 3-8
+
+SUMMARY:
+This book empowers parents to embrace play as the most powerful vehicle for their child's holistic development and learning. It demystifies play-based learning, offering practical strategies and a clear framework to foster curiosity, critical thinking, and social-emotional intelligence through engaging, child-led experiences. Discover how to create an environment where learning flourishes naturally, preparing your child not just for school, but for a lifetime of joyful discovery.
+
+THEMES:
+1. Play as the primary mode of learning and development for young children.
+2. Empowering parents to be responsive facilitators, not just instructors, in their child's learning journey.
+3. Fostering holistic child development encompassing cognitive, social, emotional, and physical domains.
+DEBUG: Preparing to process chapters
+DEBUG: Found 15 chapters to process
+DEBUG: Starting processing for chapter 1
+ℹ️ Resuming from chapter: 7
+⏭️ Skipping Chapter 1 (already exists)
+DEBUG: Starting processing for chapter 2
+⏭️ Skipping Chapter 2 (already exists)
+DEBUG: Starting processing for chapter 3
+⏭️ Skipping Chapter 3 (already exists)
+DEBUG: Starting processing for chapter 4
+⏭️ Skipping Chapter 4 (already exists)
+DEBUG: Starting processing for chapter 5
+⏭️ Skipping Chapter 5 (already exists)
+DEBUG: Starting processing for chapter 6
+⏭️ Skipping Chapter 6 (already exists)
+DEBUG: Starting processing for chapter 7
+Debug: Including full content of last chapter 6 for context
+Debug: Getting style and tone instructions for chapter 7
+Debug: Getting style instructions for chapter 7
+Debug: Arguments passed:    --chapters-only ./book_outputs/the-playful-path-unlocking-your-childs-potential-through-joyful-play-based-learning-for-ages-3-8-20250827_104338//book_outline_reviewed.md
+Debug: OUTLINE_ONLY is set to: false
+Debug: OUTLINE_CONTENT in --chapters-only mode:
+BOOK TITLE: The Playful Path
+SUBTITLE: Unlocking Your Child's Potential Through Joyful, Play-Based Learning for Ages 3-8
+
+SUMMARY:
+This book empowers parents to embrace play as the most powerful vehicle for their child's holistic development and learning. It demystifies play-based learning, offering practical strategies and a clear framework to foster curiosity, critical thinking, and social-emotional intelligence through engaging, child-led experiences. Discover how to create an environment where learning flourishes naturally, preparing your child not just for school, but for a lifetime of joyful discovery.
+
+THEMES:
+1. Play as the primary mode of learning and development for young children.
+2. Empowering parents to be responsive facilitators, not just instructors, in their child's learning journey.
+3. Fostering holistic child development encompassing cognitive, social, emotional, and physical domains.
+Debug: Starting final draft step with OUTLINE_CONTENT:
+BOOK TITLE: The Playful Path
+SUBTITLE: Unlocking Your Child's Potential Through Joyful, Play-Based Learning for Ages 3-8
+
+SUMMARY:
+This book empowers parents to embrace play as the most powerful vehicle for their child's holistic development and learning. It demystifies play-based learning, offering practical strategies and a clear framework to foster curiosity, critical thinking, and social-emotional intelligence through engaging, child-led experiences. Discover how to create an environment where learning flourishes naturally, preparing your child not just for school, but for a lifetime of joyful discovery.
+
+THEMES:
+1. Play as the primary mode of learning and development for young children.
+2. Empowering parents to be responsive facilitators, not just instructors, in their child's learning journey.
+3. Fostering holistic child development encompassing cognitive, social, emotional, and physical domains.
+DEBUG: Preparing to process chapters
+DEBUG: Found 15 chapters to process
+DEBUG: Starting processing for chapter 1
+ℹ️ Resuming from chapter: 7
+⏭️ Skipping Chapter 1 (already exists)
+DEBUG: Starting processing for chapter 2
+⏭️ Skipping Chapter 2 (already exists)
+DEBUG: Starting processing for chapter 3
+⏭️ Skipping Chapter 3 (already exists)
+DEBUG: Starting processing for chapter 4
+⏭️ Skipping Chapter 4 (already exists)
+DEBUG: Starting processing for chapter 5
+⏭️ Skipping Chapter 5 (already exists)
+DEBUG: Starting processing for chapter 6
+⏭️ Skipping Chapter 6 (already exists)
+DEBUG: Starting processing for chapter 7
+Debug: Including full content of last chapter 6 for context
+Debug: Getting style and tone instructions for chapter 7
+Debug: Getting style instructions for chapter 7
+DEBUG: Error at line 1952: Command "multi_check_plagiarism "$CHAPTER_FILE" > /dev/null 2>&1" exited with status 127
+DEBUG: Starting processing for chapter 8
+Debug: Including full content of last chapter 7 for context
+Debug: Getting style and tone instructions for chapter 8
+Debug: Getting style instructions for chapter 8
+DEBUG: Error at line 1952: Command "multi_check_plagiarism "$CHAPTER_FILE" > /dev/null 2>&1" exited with status 127
+DEBUG: Starting processing for chapter 9
+Debug: Including full content of last chapter 8 for context
+Debug: Getting style and tone instructions for chapter 9
+Debug: Getting style instructions for chapter 9
+DEBUG: Error at line 1952: Command "multi_check_plagiarism "$CHAPTER_FILE" > /dev/null 2>&1" exited with status 127
+DEBUG: Starting processing for chapter 10
+Debug: Including full content of last chapter 9 for context
+Debug: Getting style and tone instructions for chapter 10
+Debug: Getting style instructions for chapter 10
+Debug: Arguments passed:    --chapters-only ./book_outputs/the-playful-path-unlocking-your-childs-potential-through-joyful-play-based-learning-for-ages-3-8-20250827_104338//book_outline_reviewed.md
+Debug: OUTLINE_ONLY is set to: false
+Debug: OUTLINE_CONTENT in --chapters-only mode:
+BOOK TITLE: The Playful Path
+SUBTITLE: Unlocking Your Child's Potential Through Joyful, Play-Based Learning for Ages 3-8
+
+SUMMARY:
+This book empowers parents to embrace play as the most powerful vehicle for their child's holistic development and learning. It demystifies play-based learning, offering practical strategies and a clear framework to foster curiosity, critical thinking, and social-emotional intelligence through engaging, child-led experiences. Discover how to create an environment where learning flourishes naturally, preparing your child not just for school, but for a lifetime of joyful discovery.
+
+THEMES:
+1. Play as the primary mode of learning and development for young children.
+2. Empowering parents to be responsive facilitators, not just instructors, in their child's learning journey.
+3. Fostering holistic child development encompassing cognitive, social, emotional, and physical domains.
+Debug: Starting final draft step with OUTLINE_CONTENT:
+BOOK TITLE: The Playful Path
+SUBTITLE: Unlocking Your Child's Potential Through Joyful, Play-Based Learning for Ages 3-8
+
+SUMMARY:
+This book empowers parents to embrace play as the most powerful vehicle for their child's holistic development and learning. It demystifies play-based learning, offering practical strategies and a clear framework to foster curiosity, critical thinking, and social-emotional intelligence through engaging, child-led experiences. Discover how to create an environment where learning flourishes naturally, preparing your child not just for school, but for a lifetime of joyful discovery.
+
+THEMES:
+1. Play as the primary mode of learning and development for young children.
+2. Empowering parents to be responsive facilitators, not just instructors, in their child's learning journey.
+3. Fostering holistic child development encompassing cognitive, social, emotional, and physical domains.
+DEBUG: Preparing to process chapters
+DEBUG: Found 15 chapters to process
+DEBUG: Starting processing for chapter 1
+ℹ️ Resuming from chapter: 10
+⏭️ Skipping Chapter 1 (already exists)
+DEBUG: Starting processing for chapter 2
+⏭️ Skipping Chapter 2 (already exists)
+DEBUG: Starting processing for chapter 3
+⏭️ Skipping Chapter 3 (already exists)
+DEBUG: Starting processing for chapter 4
+⏭️ Skipping Chapter 4 (already exists)
+DEBUG: Starting processing for chapter 5
+⏭️ Skipping Chapter 5 (already exists)
+DEBUG: Starting processing for chapter 6
+⏭️ Skipping Chapter 6 (already exists)
+DEBUG: Starting processing for chapter 7
+⏭️ Skipping Chapter 7 (already exists)
+DEBUG: Starting processing for chapter 8
+⏭️ Skipping Chapter 8 (already exists)
+DEBUG: Starting processing for chapter 9
+⏭️ Skipping Chapter 9 (already exists)
+DEBUG: Starting processing for chapter 10
+Debug: Including full content of last chapter 9 for context
+Debug: Getting style and tone instructions for chapter 10
+Debug: Getting style instructions for chapter 10
+DEBUG: Error at line 1953: Command "multi_check_plagiarism "$CHAPTER_FILE" > /dev/null 2>&1" exited with status 127
+DEBUG: Starting processing for chapter 11
+Debug: Including full content of last chapter 10 for context
+Debug: Getting style and tone instructions for chapter 11
+Debug: Getting style instructions for chapter 11
+DEBUG: Error at line 1953: Command "multi_check_plagiarism "$CHAPTER_FILE" > /dev/null 2>&1" exited with status 127
+DEBUG: Starting processing for chapter 12
+Debug: Including full content of last chapter 11 for context
+Debug: Getting style and tone instructions for chapter 12
+Debug: Getting style instructions for chapter 12
+Debug: Arguments passed:    --chapters-only ./book_outputs/the-playful-path-unlocking-your-childs-potential-through-joyful-play-based-learning-for-ages-3-8-20250827_104338//book_outline_reviewed.md
+Debug: OUTLINE_ONLY is set to: false
+Debug: OUTLINE_CONTENT in --chapters-only mode:
+BOOK TITLE: The Playful Path
+SUBTITLE: Unlocking Your Child's Potential Through Joyful, Play-Based Learning for Ages 3-8
+
+SUMMARY:
+This book empowers parents to embrace play as the most powerful vehicle for their child's holistic development and learning. It demystifies play-based learning, offering practical strategies and a clear framework to foster curiosity, critical thinking, and social-emotional intelligence through engaging, child-led experiences. Discover how to create an environment where learning flourishes naturally, preparing your child not just for school, but for a lifetime of joyful discovery.
+
+THEMES:
+1. Play as the primary mode of learning and development for young children.
+2. Empowering parents to be responsive facilitators, not just instructors, in their child's learning journey.
+3. Fostering holistic child development encompassing cognitive, social, emotional, and physical domains.
+Debug: Starting final draft step with OUTLINE_CONTENT:
+BOOK TITLE: The Playful Path
+SUBTITLE: Unlocking Your Child's Potential Through Joyful, Play-Based Learning for Ages 3-8
+
+SUMMARY:
+This book empowers parents to embrace play as the most powerful vehicle for their child's holistic development and learning. It demystifies play-based learning, offering practical strategies and a clear framework to foster curiosity, critical thinking, and social-emotional intelligence through engaging, child-led experiences. Discover how to create an environment where learning flourishes naturally, preparing your child not just for school, but for a lifetime of joyful discovery.
+
+THEMES:
+1. Play as the primary mode of learning and development for young children.
+2. Empowering parents to be responsive facilitators, not just instructors, in their child's learning journey.
+3. Fostering holistic child development encompassing cognitive, social, emotional, and physical domains.
+DEBUG: Preparing to process chapters
+DEBUG: Found 15 chapters to process
+DEBUG: Starting processing for chapter 1
+ℹ️ Resuming from chapter: 12
+⏭️ Skipping Chapter 1 (already exists)
+DEBUG: Starting processing for chapter 2
+⏭️ Skipping Chapter 2 (already exists)
+DEBUG: Starting processing for chapter 3
+⏭️ Skipping Chapter 3 (already exists)
+DEBUG: Starting processing for chapter 4
+⏭️ Skipping Chapter 4 (already exists)
+DEBUG: Starting processing for chapter 5
+⏭️ Skipping Chapter 5 (already exists)
+DEBUG: Starting processing for chapter 6
+⏭️ Skipping Chapter 6 (already exists)
+DEBUG: Starting processing for chapter 7
+⏭️ Skipping Chapter 7 (already exists)
+DEBUG: Starting processing for chapter 8
+⏭️ Skipping Chapter 8 (already exists)
+DEBUG: Starting processing for chapter 9
+⏭️ Skipping Chapter 9 (already exists)
+DEBUG: Starting processing for chapter 10
+⏭️ Skipping Chapter 10 (already exists)
+DEBUG: Starting processing for chapter 11
+⏭️ Skipping Chapter 11 (already exists)
+DEBUG: Starting processing for chapter 12
+Debug: Including full content of last chapter 11 for context
+Debug: Getting style and tone instructions for chapter 12
+Debug: Getting style instructions for chapter 12
+Debug: Arguments passed:    --chapters-only ./book_outputs/the-playful-path-unlocking-your-childs-potential-through-joyful-play-based-learning-for-ages-3-8-20250827_104338//book_outline_reviewed.md
+Debug: OUTLINE_ONLY is set to: false
+Debug: OUTLINE_CONTENT in --chapters-only mode:
+BOOK TITLE: The Playful Path
+SUBTITLE: Unlocking Your Child's Potential Through Joyful, Play-Based Learning for Ages 3-8
+
+SUMMARY:
+This book empowers parents to embrace play as the most powerful vehicle for their child's holistic development and learning. It demystifies play-based learning, offering practical strategies and a clear framework to foster curiosity, critical thinking, and social-emotional intelligence through engaging, child-led experiences. Discover how to create an environment where learning flourishes naturally, preparing your child not just for school, but for a lifetime of joyful discovery.
+
+THEMES:
+1. Play as the primary mode of learning and development for young children.
+2. Empowering parents to be responsive facilitators, not just instructors, in their child's learning journey.
+3. Fostering holistic child development encompassing cognitive, social, emotional, and physical domains.
+Debug: Starting final draft step with OUTLINE_CONTENT:
+BOOK TITLE: The Playful Path
+SUBTITLE: Unlocking Your Child's Potential Through Joyful, Play-Based Learning for Ages 3-8
+
+SUMMARY:
+This book empowers parents to embrace play as the most powerful vehicle for their child's holistic development and learning. It demystifies play-based learning, offering practical strategies and a clear framework to foster curiosity, critical thinking, and social-emotional intelligence through engaging, child-led experiences. Discover how to create an environment where learning flourishes naturally, preparing your child not just for school, but for a lifetime of joyful discovery.
+
+THEMES:
+1. Play as the primary mode of learning and development for young children.
+2. Empowering parents to be responsive facilitators, not just instructors, in their child's learning journey.
+3. Fostering holistic child development encompassing cognitive, social, emotional, and physical domains.
+DEBUG: Preparing to process chapters
+DEBUG: Found 15 chapters to process
+DEBUG: Starting processing for chapter 1
+ℹ️ Resuming from chapter: 13
+⏭️ Skipping Chapter 1 (already exists)
+DEBUG: Starting processing for chapter 2
+⏭️ Skipping Chapter 2 (already exists)
+DEBUG: Starting processing for chapter 3
+⏭️ Skipping Chapter 3 (already exists)
+DEBUG: Starting processing for chapter 4
+⏭️ Skipping Chapter 4 (already exists)
+DEBUG: Starting processing for chapter 5
+⏭️ Skipping Chapter 5 (already exists)
+DEBUG: Starting processing for chapter 6
+⏭️ Skipping Chapter 6 (already exists)
+DEBUG: Starting processing for chapter 7
+⏭️ Skipping Chapter 7 (already exists)
+DEBUG: Starting processing for chapter 8
+⏭️ Skipping Chapter 8 (already exists)
+DEBUG: Starting processing for chapter 9
+⏭️ Skipping Chapter 9 (already exists)
+DEBUG: Starting processing for chapter 10
+⏭️ Skipping Chapter 10 (already exists)
+DEBUG: Starting processing for chapter 11
+⏭️ Skipping Chapter 11 (already exists)
+DEBUG: Starting processing for chapter 12
+⏭️ Skipping Chapter 12 (already exists)
+DEBUG: Starting processing for chapter 13
+Debug: Including full content of last chapter 12 for context
+Debug: Getting style and tone instructions for chapter 13
+Debug: Getting style instructions for chapter 13
+Debug: Arguments passed:    --chapters-only ./book_outputs/the-playful-path-unlocking-your-childs-potential-through-joyful-play-based-learning-for-ages-3-8-20250827_104338//book_outline_reviewed.md
+Debug: OUTLINE_ONLY is set to: false
+Debug: OUTLINE_CONTENT in --chapters-only mode:
+BOOK TITLE: The Playful Path
+SUBTITLE: Unlocking Your Child's Potential Through Joyful, Play-Based Learning for Ages 3-8
+
+SUMMARY:
+This book empowers parents to embrace play as the most powerful vehicle for their child's holistic development and learning. It demystifies play-based learning, offering practical strategies and a clear framework to foster curiosity, critical thinking, and social-emotional intelligence through engaging, child-led experiences. Discover how to create an environment where learning flourishes naturally, preparing your child not just for school, but for a lifetime of joyful discovery.
+
+THEMES:
+1. Play as the primary mode of learning and development for young children.
+2. Empowering parents to be responsive facilitators, not just instructors, in their child's learning journey.
+3. Fostering holistic child development encompassing cognitive, social, emotional, and physical domains.
+Debug: Starting final draft step with OUTLINE_CONTENT:
+BOOK TITLE: The Playful Path
+SUBTITLE: Unlocking Your Child's Potential Through Joyful, Play-Based Learning for Ages 3-8
+
+SUMMARY:
+This book empowers parents to embrace play as the most powerful vehicle for their child's holistic development and learning. It demystifies play-based learning, offering practical strategies and a clear framework to foster curiosity, critical thinking, and social-emotional intelligence through engaging, child-led experiences. Discover how to create an environment where learning flourishes naturally, preparing your child not just for school, but for a lifetime of joyful discovery.
+
+THEMES:
+1. Play as the primary mode of learning and development for young children.
+2. Empowering parents to be responsive facilitators, not just instructors, in their child's learning journey.
+3. Fostering holistic child development encompassing cognitive, social, emotional, and physical domains.
+DEBUG: Preparing to process chapters
+DEBUG: Found 15 chapters to process
+DEBUG: Starting processing for chapter 1
+ℹ️ Resuming from chapter: 13
+⏭️ Skipping Chapter 1 (already exists)
+DEBUG: Starting processing for chapter 2
+⏭️ Skipping Chapter 2 (already exists)
+DEBUG: Starting processing for chapter 3
+⏭️ Skipping Chapter 3 (already exists)
+DEBUG: Starting processing for chapter 4
+⏭️ Skipping Chapter 4 (already exists)
+DEBUG: Starting processing for chapter 5
+⏭️ Skipping Chapter 5 (already exists)
+DEBUG: Starting processing for chapter 6
+⏭️ Skipping Chapter 6 (already exists)
+DEBUG: Starting processing for chapter 7
+⏭️ Skipping Chapter 7 (already exists)
+DEBUG: Starting processing for chapter 8
+⏭️ Skipping Chapter 8 (already exists)
+DEBUG: Starting processing for chapter 9
+⏭️ Skipping Chapter 9 (already exists)
+DEBUG: Starting processing for chapter 10
+⏭️ Skipping Chapter 10 (already exists)
+DEBUG: Starting processing for chapter 11
+⏭️ Skipping Chapter 11 (already exists)
+DEBUG: Starting processing for chapter 12
+⏭️ Skipping Chapter 12 (already exists)
+DEBUG: Starting processing for chapter 13
+Debug: Including full content of last chapter 12 for context
+Debug: Getting style and tone instructions for chapter 13
+Debug: Getting style instructions for chapter 13
+Debug: Arguments passed:    --chapters-only ./book_outputs/the-playful-path-unlocking-your-childs-potential-through-joyful-play-based-learning-for-ages-3-8-20250827_104338//book_outline_reviewed.md
+Debug: OUTLINE_ONLY is set to: false
+Debug: OUTLINE_CONTENT in --chapters-only mode:
+BOOK TITLE: The Playful Path
+SUBTITLE: Unlocking Your Child's Potential Through Joyful, Play-Based Learning for Ages 3-8
+
+SUMMARY:
+This book empowers parents to embrace play as the most powerful vehicle for their child's holistic development and learning. It demystifies play-based learning, offering practical strategies and a clear framework to foster curiosity, critical thinking, and social-emotional intelligence through engaging, child-led experiences. Discover how to create an environment where learning flourishes naturally, preparing your child not just for school, but for a lifetime of joyful discovery.
+
+THEMES:
+1. Play as the primary mode of learning and development for young children.
+2. Empowering parents to be responsive facilitators, not just instructors, in their child's learning journey.
+3. Fostering holistic child development encompassing cognitive, social, emotional, and physical domains.
+Debug: Starting final draft step with OUTLINE_CONTENT:
+BOOK TITLE: The Playful Path
+SUBTITLE: Unlocking Your Child's Potential Through Joyful, Play-Based Learning for Ages 3-8
+
+SUMMARY:
+This book empowers parents to embrace play as the most powerful vehicle for their child's holistic development and learning. It demystifies play-based learning, offering practical strategies and a clear framework to foster curiosity, critical thinking, and social-emotional intelligence through engaging, child-led experiences. Discover how to create an environment where learning flourishes naturally, preparing your child not just for school, but for a lifetime of joyful discovery.
+
+THEMES:
+1. Play as the primary mode of learning and development for young children.
+2. Empowering parents to be responsive facilitators, not just instructors, in their child's learning journey.
+3. Fostering holistic child development encompassing cognitive, social, emotional, and physical domains.
+DEBUG: Preparing to process chapters
+DEBUG: Found 15 chapters to process
+DEBUG: Starting processing for chapter 1
+ℹ️ Resuming from chapter: 14
+⏭️ Skipping Chapter 1 (already exists)
+DEBUG: Starting processing for chapter 2
+⏭️ Skipping Chapter 2 (already exists)
+DEBUG: Starting processing for chapter 3
+⏭️ Skipping Chapter 3 (already exists)
+DEBUG: Starting processing for chapter 4
+⏭️ Skipping Chapter 4 (already exists)
+DEBUG: Starting processing for chapter 5
+⏭️ Skipping Chapter 5 (already exists)
+DEBUG: Starting processing for chapter 6
+⏭️ Skipping Chapter 6 (already exists)
+DEBUG: Starting processing for chapter 7
+⏭️ Skipping Chapter 7 (already exists)
+DEBUG: Starting processing for chapter 8
+⏭️ Skipping Chapter 8 (already exists)
+DEBUG: Starting processing for chapter 9
+⏭️ Skipping Chapter 9 (already exists)
+DEBUG: Starting processing for chapter 10
+⏭️ Skipping Chapter 10 (already exists)
+DEBUG: Starting processing for chapter 11
+⏭️ Skipping Chapter 11 (already exists)
+DEBUG: Starting processing for chapter 12
+⏭️ Skipping Chapter 12 (already exists)
+DEBUG: Starting processing for chapter 13
+⏭️ Skipping Chapter 13 (already exists)
+DEBUG: Starting processing for chapter 14
+Debug: Including full content of last chapter 13 for context
+Debug: Getting style and tone instructions for chapter 14
+Debug: Getting style instructions for chapter 14
+Debug: Arguments passed:    --chapters-only ./book_outputs/the-playful-path-unlocking-your-childs-potential-through-joyful-play-based-learning-for-ages-3-8-20250827_104338//book_outline_reviewed.md
+Debug: OUTLINE_ONLY is set to: false
+Debug: OUTLINE_CONTENT in --chapters-only mode:
+BOOK TITLE: The Playful Path
+SUBTITLE: Unlocking Your Child's Potential Through Joyful, Play-Based Learning for Ages 3-8
+
+SUMMARY:
+This book empowers parents to embrace play as the most powerful vehicle for their child's holistic development and learning. It demystifies play-based learning, offering practical strategies and a clear framework to foster curiosity, critical thinking, and social-emotional intelligence through engaging, child-led experiences. Discover how to create an environment where learning flourishes naturally, preparing your child not just for school, but for a lifetime of joyful discovery.
+
+THEMES:
+1. Play as the primary mode of learning and development for young children.
+2. Empowering parents to be responsive facilitators, not just instructors, in their child's learning journey.
+3. Fostering holistic child development encompassing cognitive, social, emotional, and physical domains.
+Debug: Starting final draft step with OUTLINE_CONTENT:
+BOOK TITLE: The Playful Path
+SUBTITLE: Unlocking Your Child's Potential Through Joyful, Play-Based Learning for Ages 3-8
+
+SUMMARY:
+This book empowers parents to embrace play as the most powerful vehicle for their child's holistic development and learning. It demystifies play-based learning, offering practical strategies and a clear framework to foster curiosity, critical thinking, and social-emotional intelligence through engaging, child-led experiences. Discover how to create an environment where learning flourishes naturally, preparing your child not just for school, but for a lifetime of joyful discovery.
+
+THEMES:
+1. Play as the primary mode of learning and development for young children.
+2. Empowering parents to be responsive facilitators, not just instructors, in their child's learning journey.
+3. Fostering holistic child development encompassing cognitive, social, emotional, and physical domains.
+DEBUG: Preparing to process chapters
+DEBUG: Found 15 chapters to process
+DEBUG: Starting processing for chapter 1
+ℹ️ Resuming from chapter: 13
+⏭️ Skipping Chapter 1 (already exists)
+DEBUG: Starting processing for chapter 2
+⏭️ Skipping Chapter 2 (already exists)
+DEBUG: Starting processing for chapter 3
+⏭️ Skipping Chapter 3 (already exists)
+DEBUG: Starting processing for chapter 4
+⏭️ Skipping Chapter 4 (already exists)
+DEBUG: Starting processing for chapter 5
+⏭️ Skipping Chapter 5 (already exists)
+DEBUG: Starting processing for chapter 6
+⏭️ Skipping Chapter 6 (already exists)
+DEBUG: Starting processing for chapter 7
+⏭️ Skipping Chapter 7 (already exists)
+DEBUG: Starting processing for chapter 8
+⏭️ Skipping Chapter 8 (already exists)
+DEBUG: Starting processing for chapter 9
+⏭️ Skipping Chapter 9 (already exists)
+DEBUG: Starting processing for chapter 10
+⏭️ Skipping Chapter 10 (already exists)
+DEBUG: Starting processing for chapter 11
+⏭️ Skipping Chapter 11 (already exists)
+DEBUG: Starting processing for chapter 12
+⏭️ Skipping Chapter 12 (already exists)
+DEBUG: Starting processing for chapter 13
+Debug: Including full content of last chapter 12 for context
+Debug: Getting style and tone instructions for chapter 13
+Debug: Getting style instructions for chapter 13
+DEBUG: Error at line 1953: Command "multi_check_plagiarism "$CHAPTER_FILE" > /dev/null 2>&1" exited with status 127
+DEBUG: Starting processing for chapter 14
+Debug: Including full content of last chapter 13 for context
+Debug: Getting style and tone instructions for chapter 14
+Debug: Getting style instructions for chapter 14
+DEBUG: Error at line 1953: Command "multi_check_plagiarism "$CHAPTER_FILE" > /dev/null 2>&1" exited with status 127
+DEBUG: Starting processing for chapter 15
+Debug: Including full content of last chapter 14 for context
+Debug: Getting style and tone instructions for chapter 15
+Debug: Getting style instructions for chapter 15
+Debug: Arguments passed:    --chapters-only ./book_outputs/the-playful-path-unlocking-your-childs-potential-through-joyful-play-based-learning-for-ages-3-8-20250827_104338//book_outline_reviewed.md
+Debug: OUTLINE_ONLY is set to: false
+Debug: OUTLINE_CONTENT in --chapters-only mode:
+BOOK TITLE: The Playful Path
+SUBTITLE: Unlocking Your Child's Potential Through Joyful, Play-Based Learning for Ages 3-8
+
+SUMMARY:
+This book empowers parents to embrace play as the most powerful vehicle for their child's holistic development and learning. It demystifies play-based learning, offering practical strategies and a clear framework to foster curiosity, critical thinking, and social-emotional intelligence through engaging, child-led experiences. Discover how to create an environment where learning flourishes naturally, preparing your child not just for school, but for a lifetime of joyful discovery.
+
+THEMES:
+1. Play as the primary mode of learning and development for young children.
+2. Empowering parents to be responsive facilitators, not just instructors, in their child's learning journey.
+3. Fostering holistic child development encompassing cognitive, social, emotional, and physical domains.
+Debug: Starting final draft step with OUTLINE_CONTENT:
+BOOK TITLE: The Playful Path
+SUBTITLE: Unlocking Your Child's Potential Through Joyful, Play-Based Learning for Ages 3-8
+
+SUMMARY:
+This book empowers parents to embrace play as the most powerful vehicle for their child's holistic development and learning. It demystifies play-based learning, offering practical strategies and a clear framework to foster curiosity, critical thinking, and social-emotional intelligence through engaging, child-led experiences. Discover how to create an environment where learning flourishes naturally, preparing your child not just for school, but for a lifetime of joyful discovery.
+
+THEMES:
+1. Play as the primary mode of learning and development for young children.
+2. Empowering parents to be responsive facilitators, not just instructors, in their child's learning journey.
+3. Fostering holistic child development encompassing cognitive, social, emotional, and physical domains.
+DEBUG: Preparing to process chapters
+DEBUG: Found 15 chapters to process
+DEBUG: Starting processing for chapter 1
+ℹ️ Resuming from chapter: 15
+⏭️ Skipping Chapter 1 (already exists)
+DEBUG: Starting processing for chapter 2
+⏭️ Skipping Chapter 2 (already exists)
+DEBUG: Starting processing for chapter 3
+⏭️ Skipping Chapter 3 (already exists)
+DEBUG: Starting processing for chapter 4
+⏭️ Skipping Chapter 4 (already exists)
+DEBUG: Starting processing for chapter 5
+⏭️ Skipping Chapter 5 (already exists)
+DEBUG: Starting processing for chapter 6
+⏭️ Skipping Chapter 6 (already exists)
+DEBUG: Starting processing for chapter 7
+⏭️ Skipping Chapter 7 (already exists)
+DEBUG: Starting processing for chapter 8
+⏭️ Skipping Chapter 8 (already exists)
+DEBUG: Starting processing for chapter 9
+⏭️ Skipping Chapter 9 (already exists)
+DEBUG: Starting processing for chapter 10
+⏭️ Skipping Chapter 10 (already exists)
+DEBUG: Starting processing for chapter 11
+⏭️ Skipping Chapter 11 (already exists)
+DEBUG: Starting processing for chapter 12
+⏭️ Skipping Chapter 12 (already exists)
+DEBUG: Starting processing for chapter 13
+⏭️ Skipping Chapter 13 (already exists)
+DEBUG: Starting processing for chapter 14
+⏭️ Skipping Chapter 14 (already exists)
+DEBUG: Starting processing for chapter 15
+Debug: Including full content of last chapter 14 for context
+Debug: Getting style and tone instructions for chapter 15
+Debug: Getting style instructions for chapter 15
+DEBUG: Error at line 1953: Command "multi_check_plagiarism "$CHAPTER_FILE" > /dev/null 2>&1" exited with status 127
+ℹ️ Resuming from chapter: 2

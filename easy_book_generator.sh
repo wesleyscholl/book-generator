@@ -19,6 +19,22 @@ escape_json() {
     echo -n "$1" | jq -Rs '.'
 }
 
+# Count only files named exactly chapter_<number>.md (prevents counting review/edited variants)
+count_numeric_chapters() {
+    local dir="$1"
+    local cnt=0
+    if [ -d "$dir" ]; then
+        for f in "$dir"/chapter_*.md; do
+            [ -f "$f" ] || continue
+            base=$(basename "$f")
+            if [[ "$base" =~ ^chapter_[0-9]+\.md$ ]]; then
+                cnt=$((cnt + 1))
+            fi
+        done
+    fi
+    echo "$cnt"
+}
+
 # Function to make API requests
 make_api_request() {
     local payload="$1"
@@ -595,7 +611,7 @@ generate_chapters_from_outline() {
         if [[ "$OUTLINE_PATH" == *"/"* ]]; then
             DIR_PATH=$(dirname "$OUTLINE_PATH")
             DIR_NAME=$(basename "$DIR_PATH")
-            CHAPTER_COUNT=$(find "$DIR_PATH" -name "chapter_*.md" 2>/dev/null | wc -l)
+            CHAPTER_COUNT=$(count_numeric_chapters "$DIR_PATH")
             
             # Handle different directory naming conventions
             if [[ "$DIR_NAME" == *"-"*"_"*"_"* || "$DIR_NAME" == *"-"*"-"*"-"* ]]; then
@@ -706,7 +722,7 @@ generate_references_menu() {
 
     for i in "${!DIRS[@]}"; do
         name=$(basename "${DIRS[$i]}")
-        count=$(ls "${DIRS[$i]}"/chapter_*.md 2>/dev/null | wc -l)
+    count=$(count_numeric_chapters "${DIRS[$i]}")
         if [ "$count" -eq 0 ]; then
             echo "   $((i+1))) 📑 $name (no chapters)"
         elif [ "$count" -eq 1 ]; then
@@ -777,7 +793,7 @@ review_and_edit_book() {
         
         for i in "${!ALL_BOOK_DIRS[@]}"; do
             DIR_NAME=$(basename "${ALL_BOOK_DIRS[$i]}")
-            CHAPTER_COUNT=$(ls "${ALL_BOOK_DIRS[$i]}"/chapter_*.md 2>/dev/null | wc -l)
+            CHAPTER_COUNT=$(count_numeric_chapters "${ALL_BOOK_DIRS[$i]}")
             echo "   $((i+1))) $DIR_NAME ($CHAPTER_COUNT chapters)"
         done
         

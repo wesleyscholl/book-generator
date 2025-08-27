@@ -2,6 +2,33 @@
 
 # Improved chapter handling functions to properly handle chapter length requirements
 
+# Animation function for waiting periods
+show_wait_animation() {
+    local wait_time=$1
+    local message=$2
+    local animation_chars=("⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏")
+    local i=0
+    local start_time=$(date +%s)
+    local end_time=$((start_time + wait_time))
+    local current_time=$start_time
+    
+    # Hide cursor
+    echo -en "\033[?25l"
+    
+    while [ $current_time -lt $end_time ]; do
+        local remaining=$((end_time - current_time))
+        local char="${animation_chars[$i]}"
+        echo -ne "\r${CYAN}${char}${RESET} ${message} (${YELLOW}${remaining}s${RESET} remaining)     "
+        i=$(((i + 1) % ${#animation_chars[@]}))
+        sleep 0.1
+        current_time=$(date +%s)
+    done
+    
+    # Show cursor and clear line
+    echo -e "\r\033[K${GREEN}✓${RESET} ${message} completed!     "
+    echo -en "\033[?25h"
+}
+
 # Function to calculate tokens required for chapter extension
 # Formula: MAX_TOKENS = (500 minimum word length * 1.25) - (current chapter word length * 1.25) 
 #          + (system prompt word length * 1.25) + (user prompt word length * 1.25) + 250
@@ -26,7 +53,7 @@ calculate_chapter_extension_tokens() {
 # Function to review and process chapter based on length
 process_chapter_by_length() {
     local chapter_file="$1"
-    local min_words="${2:-2200}"
+    local min_words="${2:-2000}"
     local max_words="${3:-2500}"
     
     # Get current word count
@@ -148,7 +175,9 @@ $chapter_content"
         # Increase token count by 20% for final attempt
         extension_tokens=$(( extension_tokens * 120 / 100 ))
     fi
-    
+    # API rate limit delay
+    local jitter=$((RANDOM % 5))
+    show_wait_animation "$((DELAY_BETWEEN_CHAPTERS + jitter))" "Chapter cooldown"
     # Call API to extend the chapter
     echo "🤖 Generating extended content using model: $model..."
     local extended_content=$(smart_api_call "$extension_prompt" "$extension_system_prompt" "chapter_extension" 0.7 "$extension_tokens" 1 "$model")

@@ -9,7 +9,7 @@ BATCH_SIZE="${2:-2}"
 GEMINI_MODEL="${GEMINI_MODEL:-gemini-1.5-pro}"
 GEMINI_KEY="${GEMINI_API_KEY:-}" # must be exported by caller/user
 COOLDOWN_BASE=${COOLDOWN_BASE:-60}   # base seconds
-COOLDOWN_JITTER=${COOLDOWN_JITTER:-30} # random jitter max
+COOLDOWN_JITTER=${COOLDOWN_JITTER:-10} # random jitter max
 MAX_RETRIES=${MAX_RETRIES:-2}
 
 SOURCES_DIR="$BOOK_DIR/sources"
@@ -26,19 +26,48 @@ mkdir -p "$SOURCES_DIR" "$TEMP_DIR" "$SEEN_DIR"
 
 log() { printf '%s %s\n' "[refs]" "$*"; }
 
-# Source the multi-provider helper (smart_api_call) if present
+# Animation function for waiting periods
+show_wait_animation() {
+    local wait_time=$1
+    local message=$2
+    local animation_chars=("⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏")
+    local i=0
+    local start_time=$(date +%s)
+    local end_time=$((start_time + wait_time))
+    local current_time=$start_time
+    
+    # Hide cursor
+    echo -en "\033[?25l"
+    
+    while [ $current_time -lt $end_time ]; do
+        local remaining=$((end_time - current_time))
+        local char="${animation_chars[$i]}"
+        echo -ne "\r${CYAN}${char}${RESET} ${message} (${YELLOW}${remaining}s${RESET} remaining)     "
+        i=$(((i + 1) % ${#animation_chars[@]}))
+        sleep 0.1
+        current_time=$(date +%s)
+    done
+    
+    # Show cursor and clear line
+    echo -e "\r\033[K${GREEN}✓${RESET} ${message} completed!     "
+    echo -en "\033[?25h"
+}
+
+# Source the multi-provider helper (smart_api_call). This script requires it.
 if [ -f "$SCRIPT_DIR/multi_provider_ai_simple.sh" ]; then
   # shellcheck source=/dev/null
   . "$SCRIPT_DIR/multi_provider_ai_simple.sh"
 else
-  log "Warning: multi_provider_ai_simple.sh not found; will attempt direct Gemini calls"
+  log "ERROR: multi_provider_ai_simple.sh not found; this script now requires smart_api_call. Please place multi_provider_ai_simple.sh alongside this script."
+  exit 1
 fi
 
 random_sleep() {
   local jitter=$((RANDOM % COOLDOWN_JITTER))
   local delay=$((COOLDOWN_BASE + jitter))
   log "Cooling down for ${delay}s (base=${COOLDOWN_BASE}s jitter=${jitter}s)"
-  sleep "$delay"
+  # API rate limit delay
+  show_wait_animation "$delay" "API cooldown"
 }
 
 build_seen_list() {
@@ -46,30 +75,8 @@ build_seen_list() {
   jq -s '[ .[] | .sources[]? ] | map({key: ((.url // .doi // .title) | ascii_downcase)}) | map(select(.key != null and .key != "")) | unique_by(.key) | map(.key)' "$SOURCES_DIR"/*_sources.json 2>/dev/null || echo '[]'
 }
 
-call_gemini_raw() {
-  local prompt_text="$1"
-  local out_file="$2"
-  local attempt=0
-  while :; do
-    attempt=$((attempt+1))
-    curl -sS -X POST \
-      "https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_KEY}" \
-      -H 'Content-Type: application/json' \
-      -d @- >"$out_file" <<EOF || true
-{
-  "contents": [{"parts": [{"text": $(printf '%s' "$prompt_text" | jq -Rs .)}]}],
-  "generationConfig": {"temperature": 0.2, "topP": 0.95, "maxOutputTokens": 8192}
-}
-EOF
-    if [ -s "$out_file" ] && grep -q '{' "$out_file" 2>/dev/null; then
-      return 0
-    fi
-    if [ $attempt -ge $MAX_RETRIES ]; then
-      return 1
-    fi
-    sleep 3
-  done
-}
+# NOTE: direct Gemini HTTP caller removed. This script requires multi_provider_ai_simple.sh
+# which provides smart_api_call. All API requests use smart_api_call now.
 
 extract_json_block() {
   local raw=$1
@@ -128,14 +135,96 @@ generate_prompt_for_batch() {
   printf '%s' "$p"
 }
 
+# How many times to retry a single chapter when API returns an empty sources array
+CHAPTER_RETRIES=${CHAPTER_RETRIES:-3}
+
 # Main processing
-chapter_files=("$BOOK_DIR"/chapter_*.md)
+# Build a numerically-sorted list of chapter files (chapter_1.md, chapter_2.md ...)
+chapter_files=()
+if ls "$BOOK_DIR"/chapter_*.md >/dev/null 2>&1; then
+  # create list with numeric prefix for safe sorting
+  # Use a direct loop on chapter files (avoid subshell array population issues)
+  for f in "$BOOK_DIR"/chapter_*.md; do
+    [ -f "$f" ] || continue
+    chapter_files+=("$f")
+  done
+  
+  # Sort the array by numeric chapter number
+  if [ ${#chapter_files[@]} -gt 0 ]; then
+    # Create a temporary file for sorting
+    SORT_TMP=$(mktemp)
+    # Write chapter files with their numeric indices for sorting
+    for f in "${chapter_files[@]}"; do
+      base=$(basename "$f")
+      num=$(echo "$base" | sed -E 's/[^0-9]*([0-9]+).*/\1/')
+      if printf '%s' "$num" | grep -qE '^[0-9]+$'; then
+        printf "%s\t%s\n" "$num" "$f"
+      fi
+    done | sort -n -k1,1 > "$SORT_TMP"
+    
+    # Clear and rebuild the array in sorted order
+    chapter_files=()
+    while IFS=$'\t' read -r _ path; do
+      chapter_files+=("$path")
+    done < "$SORT_TMP"
+    rm -f "$SORT_TMP"
+  fi
+  # Count matched chapter files without expanding the array (avoid unbound var with set -u)
+  matched_count=0
+  for _cf in "$BOOK_DIR"/chapter_*.md; do
+    [ -f "$_cf" ] || continue
+    matched_count=$((matched_count + 1))
+  done
+  log "Matched ${matched_count} chapter files in $BOOK_DIR"
+fi
+
 [ -e "${chapter_files[0]:-}" ] || { log "No chapters found in $BOOK_DIR"; exit 0; }
 
 total=${#chapter_files[@]}
-log "Found $total chapters; batch size $BATCH_SIZE"
+log "Found $total chapters (numerically ordered); batch size $BATCH_SIZE"
 
-i=0
+# Determine resume index from existing per-chapter source files.
+# Find the highest index in chapter_files that already has a corresponding
+# "$SOURCES_DIR/<chapter_basename>_sources.json" and start at the next one.
+# Determine START_CHAPTER from existing per-chapter sources files if not set.
+# We prefer resuming based on generated sources: look for "$SOURCES_DIR/<chapter_basename>_sources.json".
+if [ -z "${START_CHAPTER:-}" ]; then
+  START_CHAPTER=1
+  if compgen -G "${BOOK_DIR}/sources/chapter_*.md_sources.json" > /dev/null 2>&1; then
+    max=0
+    for f in "${BOOK_DIR}"/sources/chapter_*.md_sources.json; do
+      base=$(basename "$f")
+      num=$(echo "$base" | sed -E 's/chapter_([0-9]+)\.md_sources\.json/\1/')
+      if [[ "$num" =~ ^[0-9]+$ ]]; then
+        if [ "$num" -gt "$max" ]; then
+          max=$num
+        fi
+      fi
+    done
+    if [ $max -gt 0 ]; then
+      START_CHAPTER=$((max + 1))
+    fi
+  fi
+  log "Resuming from chapter: $START_CHAPTER"
+fi
+
+# Find the first chapter file whose numeric index is >= START_CHAPTER
+start_index=0
+for idx in "${!chapter_files[@]}"; do
+  b=$(basename "${chapter_files[idx]}")
+  num=$(echo "$b" | sed -E 's/[^0-9]*([0-9]+).*/\1/')
+  if printf '%s' "$num" | grep -qE '^[0-9]+$' && [ "$num" -ge "$START_CHAPTER" ]; then
+    start_index=$idx
+    break
+  fi
+done
+
+if [ "$start_index" -ge "$total" ]; then
+  log "All chapters already processed (start_index $start_index >= total $total); nothing to do."
+  exit 0
+fi
+
+i=$start_index
 while [ $i -lt $total ]; do
   batch_files=()
   for ((k=0;k<BATCH_SIZE && i<total; k++)); do
@@ -155,8 +244,11 @@ while [ $i -lt $total ]; do
   # pass batch_files elements as positional args
   PROMPT=$(generate_prompt_for_batch "${batch_files[@]}")
   RAW_OUT="$TEMP_DIR/raw_$(date +%s).txt"
-  if ! call_gemini_raw "$PROMPT" "$RAW_OUT"; then
-    log "Gemini call failed for batch; saving raw output"
+
+  # Call smart_api_call (multi-provider helper is required)
+  log "Calling smart_api_call for batch"
+  if ! smart_api_call "$PROMPT" "" "general" 0.2 8192 $MAX_RETRIES "" > "$RAW_OUT" 2>/dev/null; then
+    log "smart_api_call failed for batch; saving raw output"
     cp "$RAW_OUT" "$SOURCES_DIR/batch_error_$(date +%s).txt" || true
     random_sleep
     continue
@@ -166,13 +258,47 @@ while [ $i -lt $total ]; do
   extract_json_block "$RAW_OUT" "$JSON_OUT"
 
   if jq -e . "$JSON_OUT" >/dev/null 2>&1; then
-    # split chapters to per-chapter files
+    # For each chapter returned, write out and handle empty-source retries
     jq -c '.chapters[]' "$JSON_OUT" | while read -r chap; do
       chap_name=$(echo "$chap" | jq -r '.chapter')
       safe=$(basename "$chap_name")
       out="$SOURCES_DIR/${safe}_sources.json"
+
+      # Check if sources array is empty
+      src_count=$(echo "$chap" | jq '.sources | length' 2>/dev/null || echo 0)
+      attempt=0
+      if [ "$src_count" -eq 0 ]; then
+        # Retry this chapter individually up to CHAPTER_RETRIES with cooldown
+        while [ $attempt -lt $CHAPTER_RETRIES ] && [ "$src_count" -eq 0 ]; do
+          attempt=$((attempt + 1))
+          log "Empty sources for $safe; retry attempt $attempt/$CHAPTER_RETRIES"
+          # regenerate prompt for this single chapter and call API
+          SINGLE_PROMPT=$(generate_prompt_for_batch "$BOOK_DIR/$safe")
+          SINGLE_OUT="$TEMP_DIR/raw_retry_${safe}_$(date +%s).txt"
+          # retry using smart_api_call
+          if ! smart_api_call "$SINGLE_PROMPT" "" "general" 0.2 8192 $MAX_RETRIES "" > "$SINGLE_OUT" 2>/dev/null; then
+            log "smart_api_call retry failed for $safe (attempt $attempt)"
+          fi
+          # try to extract JSON
+          extract_json_block "$SINGLE_OUT" "$TEMP_DIR/parsed_retry_${safe}_$(date +%s).json" || true
+          # read sources length if possible
+          if jq -e . "$TEMP_DIR/parsed_retry_${safe}_$(date +%s).json" >/dev/null 2>&1; then
+            newsrc_count=$(jq '.chapters[0].sources | length' "$TEMP_DIR/parsed_retry_${safe}_$(date +%s).json" 2>/dev/null || echo 0)
+            if [ "$newsrc_count" -gt 0 ]; then
+              # replace chap with new content
+              chap=$(jq -c '.chapters[0]' "$TEMP_DIR/parsed_retry_${safe}_$(date +%s).json")
+              src_count=$newsrc_count
+              log "Retry for $safe returned $src_count sources"
+            fi
+          fi
+          # cooldown before next retry
+          random_sleep
+        done
+      fi
+
+      # write result (either original or retried)
       echo "$chap" | jq '.' > "$out"
-      log "Wrote sources for $safe -> $out"
+      log "Wrote sources for $safe -> $out (sources: ${src_count:-0})"
       # merge into seen index
       merge_into_seen "$out"
     done
@@ -211,9 +337,7 @@ for f in "$SEEN_DIR"/*.json; do
   [ -n "$pub" ] && echo "- **Publisher:** $pub" >> "$FINAL_MD"
   [ -n "$datep" ] && echo "- **Date:** $datep" >> "$FINAL_MD"
   [ -n "$url" ] && echo "- **URL:** $url" >> "$FINAL_MD"
-  [ -n "$doi" ] && echo "- **DOI:** $doi" >> "$FINAL_MD"
-  [ -n "$relevance" ] && echo "- **Relevance:** $relevance/10" >> "$FINAL_MD"
-  echo "- **Referenced in:** $chapters" >> "$FINAL_MD"
+  [ -n "$doi" ] && [ "$doi" != "n/a" ] && [ "$doi" != "N/A" ] && [ "$doi" != "" ] && echo "- **DOI:** $doi" >> "$FINAL_MD"
   [ -n "$summary" ] && echo "- **Summary:** $summary" >> "$FINAL_MD"
   if [ -n "$apa" ] || [ -n "$mla" ]; then
     echo "- **Citations:**" >> "$FINAL_MD"

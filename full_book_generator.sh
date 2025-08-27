@@ -98,6 +98,7 @@ MAX_TOKENS=8192
 MAX_RETRIES=1
 MIN_WORDS=2200
 MAX_WORDS=2500
+ACCEPTABLE_WORDS=1700
 WRITING_STYLE="detailed"
 TONE="professional"
 DELAY_BETWEEN_CHAPTERS=60  # Seconds to avoid rate limits
@@ -1964,16 +1965,68 @@ for CHAPTER_LINE in "${CHAPTER_LINES[@]}"; do
 
     # Ideally, if generate chapters from outline is selected, it should start from the last completed chapter
 
-    # Collect existing chapters for context
-    EXISTING_CHAPTERS=""
-    for i in $(seq 1 $((CHAPTER_NUM - 1))); do
-        echo "Debug: Collecting existing chapter $i for context" >> debug.log
-        CHAPTER_FILE="${BOOK_DIR}/chapter_${i}.md"
-        if [ -f "$CHAPTER_FILE" ]; then
-            CHAPTER_CONTENT=$(cat "$CHAPTER_FILE")
-            EXISTING_CHAPTERS="${EXISTING_CHAPTERS}\n\n=== CHAPTER $i ===\n${CHAPTER_CONTENT}"
+    # Determine starting chapter: if user has existing chapter files, resume from next
+    # This allows resuming generation without overwriting completed chapters
+    if [ -z "${START_CHAPTER:-}" ]; then
+        START_CHAPTER=1
+        if compgen -G "${BOOK_DIR}/chapter_*.md" > /dev/null 2>&1; then
+            max=0
+            for f in "${BOOK_DIR}"/chapter_*.md; do
+                base=$(basename "$f")
+                num=$(echo "$base" | sed -E 's/chapter_([0-9]+)\.md/\1/')
+                if [[ "$num" =~ ^[0-9]+$ ]]; then
+                    if [ "$num" -gt "$max" ]; then
+                        max=$num
+                    fi
+                fi
+            done
+            if [ $max -gt 0 ]; then
+                START_CHAPTER=$((max + 1))
+            fi
         fi
-    done
+        echo "ℹ️ Resuming from chapter: $START_CHAPTER" >> debug.log
+    fi
+
+    # If this chapter number is less than START_CHAPTER, skip it (already generated)
+    if [ "$CHAPTER_NUM" -lt "$START_CHAPTER" ]; then
+        echo "⏭️ Skipping Chapter $CHAPTER_NUM (already exists)" >> debug.log
+        continue
+    fi
+
+    # Only pass a small amount of context to avoid token limits.
+    # By default, pass only the immediate previous chapter in full.
+    # Optionally, set BRIEF_PREV_WORDS to >0 to also include the first N words of earlier chapters.
+    BRIEF_PREV_WORDS=${BRIEF_PREV_WORDS:-0}
+
+    # Helper: return first N words of a file
+    first_n_words() {
+        local file="$1"; local n="$2"
+        awk -v n="$n" 'BEGIN{count=0} { for(i=1;i<=NF;i++){ count++; printf "%s ", $i; if(count>=n) exit } }' "$file"
+    }
+
+    EXISTING_CHAPTERS=""
+    # If there is at least one prior chapter, include the last one in full
+    LAST_INDEX=$((CHAPTER_NUM - 1))
+    if [ $LAST_INDEX -ge 1 ]; then
+        CHAPTER_FILE="${BOOK_DIR}/chapter_${LAST_INDEX}.md"
+        if [ -f "$CHAPTER_FILE" ]; then
+            echo "Debug: Including full content of last chapter $LAST_INDEX for context" >> debug.log
+            LAST_CONTENT=$(cat "$CHAPTER_FILE")
+            EXISTING_CHAPTERS="${EXISTING_CHAPTERS}\n\n=== LAST_CHAPTER ${LAST_INDEX} ===\n${LAST_CONTENT}"
+        fi
+    fi
+
+    # Optionally include brief opening snippets from earlier chapters (1..LAST_INDEX-1)
+    if [ "$BRIEF_PREV_WORDS" -gt 0 ] && [ $LAST_INDEX -gt 1 ]; then
+        for i in $(seq 1 $((LAST_INDEX - 1))); do
+            CHAPTER_FILE="${BOOK_DIR}/chapter_${i}.md"
+            if [ -f "$CHAPTER_FILE" ]; then
+                echo "Debug: Including first $BRIEF_PREV_WORDS words of chapter $i" >> debug.log
+                snippet=$(first_n_words "$CHAPTER_FILE" "$BRIEF_PREV_WORDS")
+                EXISTING_CHAPTERS="${EXISTING_CHAPTERS}\n\n=== CHAPTER ${i} (snippet) ===\n${snippet}"
+            fi
+        done
+    fi
 
     # Style and tone instructions
     get_style_instructions() {
@@ -2024,11 +2077,10 @@ OUTLINE_CONTENT=$(echo "$OUTLINE_CONTENT" | sed 's/\*\*//g')
 CHAPTER_USER_PROMPT="Write Chapter ${CHAPTER_NUM}: '${CHAPTER_TITLE}'.
 
 CONTEXT:
-- **Book Outline:** The book explores the power of play-based learning. This chapter, '${CHAPTER_TITLE}', challenges the misconception that play is frivolous, arguing it is a foundational, brain-building activity. It should transition from a critique of modern societal views to a deep exploration of the profound learning embedded in simple play, setting up the scientific explanations in the next chapter.
-- **Previous Chapters:** ${EXISTING_CHAPTERS}
+${OUTLINE_CONTENT}
 
 REQUIREMENTS:
-- **Length:** Strive for 2200-2500 words. Prioritize reaching at least 2200 words.
+- **Length:** Strive for $MIN_WORDS-$MAX_WORDS words. Prioritize reaching at least $MIN_WORDS words.
 - **Style & Tone:** Adopt a compelling, narrative-driven style and an encouraging, authoritative tone. The writing should feel like a trusted mentor guiding the reader.
 - **Expansion Focus:** For each example of play (e.g., arranging stones, building a fort, imaginary friends), dedicate significant space (at least 3-4 paragraphs) to fully expand on the cognitive, emotional, social, and physical benefits. Elaborate on the "why" and "how" of the learning process within these simple scenarios.
 - **Narrative Depth:** Weave in relatable anecdotes and scenarios that emotionally connect with the reader. Use vivid language and sensory details to bring the examples to life.
@@ -2048,7 +2100,7 @@ OUTPUT:
 # Chapter ${CHAPTER_NUM}
 ## ${CHAPTER_TITLE}
 
-- **Do not exceed 2500 words.**"
+- **Do not exceed $MAX_WORDS words.**"
 
     # STREAMLINED CHAPTER GENERATION WORKFLOW
     # Step 1: Generate initial chapter
@@ -2172,7 +2224,7 @@ OUTPUT:
         echo "✅ Optimized chapter handler loaded"
         
         # Process the chapter using our new logic
-        process_chapter_by_length "$CHAPTER_FILE" "$MIN_WORDS" "$MAX_WORDS"
+        process_chapter_by_length "$CHAPTER_FILE" "$ACCEPTABLE_WORDS" "$MAX_WORDS"
     else
         # Fallback to original logic if the optimized handler isn't available
         echo "⚠️ Optimized chapter handler not found, using legacy approach"
@@ -2200,12 +2252,15 @@ OUTPUT:
     echo "📊 Chapter $CHAPTER_NUM final word count: $FINAL_WORD_COUNT words"
     
     # Notify if chapter is still below minimum after all processing
-    if [ "$FINAL_WORD_COUNT" -lt "$MIN_WORDS" ]; then
+    if [ "$FINAL_WORD_COUNT" -lt "$ACCEPTABLE_WORDS" ]; then
         echo "⚠️ WARNING: Chapter $CHAPTER_NUM is still below minimum word count after all processing attempts"
+        # Add random jitter to delay
+        jitter=$((RANDOM % 5))
+        show_wait_animation "$((DELAY_BETWEEN_CHAPTERS + jitter))" "Chapter cooldown"
         echo "🔄 Making one final extension attempt with increased parameters..."
         
         # Try one more extension with a different model and higher temperature
-        final_extension_tokens=$(calculate_chapter_extension_tokens "$FINAL_WORD_COUNT" "$MIN_WORDS")
+        final_extension_tokens=$(calculate_chapter_extension_tokens "$FINAL_WORD_COUNT" "$ACCEPTABLE_WORDS")
         final_extension_tokens=$(( final_extension_tokens * 120 / 100 ))  # Add 20% more tokens
         
         final_prompt="URGENT: This chapter MUST be extended to at least ${MIN_WORDS} words (currently only ${FINAL_WORD_COUNT} words).
@@ -2306,12 +2361,14 @@ $(cat "$CHAPTER_FILE")"
     CHAPTER_SECONDS=$((CHAPTER_ELAPSED_TIME % 60))
     
     echo "✅ Chapter $CHAPTER_NUM complete - $WORD_COUNT words (took ${CHAPTER_MINUTES}m ${CHAPTER_SECONDS}s)"
-    
-    # Rate limiting delay (except for last chapter)
-    echo "⏳ Waiting between chapters to avoid API rate limits..."
-    # Add random jitter to delay
-    local jitter=$((RANDOM % 5))
-    show_wait_animation "$((DELAY_BETWEEN_CHAPTERS + jitter))" "Chapter cooldown"
+
+    if [ "$CHAPTER_NUM" -lt "$CHAPTER_COUNT" ]; then
+        # Rate limiting delay (except for last chapter)
+        echo "⏳ Waiting between chapters to avoid API rate limits..."
+        # Add random jitter to delay
+        jitter=$((RANDOM % 5))
+        show_wait_animation "$((DELAY_BETWEEN_CHAPTERS + jitter))" "Chapter cooldown"
+    fi
 done
 
 # Final statistics and compilation
