@@ -824,51 +824,50 @@ calculate_chapter_extension_tokens() {
     echo "$tokens"
 }
 
-append_until_min_words() {
+expand_chapter() {
     local chapter_file="$1"
-    local min_words="$2"
+    local min_words="${2:-2200}"
+    local max_words="${3:-2500}"
     local attempt=1
-    local max_attempts=3  # Reduced from 5 to 3
+    local max_attempts=1
     local current_words=$(wc -w < "$chapter_file" | tr -d ' ')
+    local current_chapter=$(cat "$chapter_file")
 
     while [ "$current_words" -lt "$min_words" ] && [ $attempt -le $max_attempts ]; do
-        echo "🔁 Auto-append attempt $attempt for $chapter_file (current: $current_words, target: $min_words)"
-        
-        # Calculate words needed
-        local words_needed=$((min_words - current_words))
-        
-        # Calculate optimal token count using our new formula
-        local extension_tokens=$(calculate_chapter_extension_tokens "$current_words" "$min_words")
-        echo "ℹ️ Using calculated token count: $extension_tokens tokens for this extension"
-        
-        # Only send the last ~500 words of content to avoid token limits
-        local content_to_send
-        local total_lines=$(wc -l < "$chapter_file")
-        if [ "$total_lines" -gt 50 ]; then
-            content_to_send=$(tail -50 "$chapter_file")
-        else
-            content_to_send=$(cat "$chapter_file")
-        fi
-        
+        echo "🔁 Chapter expansion attempt $attempt for $chapter_file (current: $current_words, target: $min_words)"
+
         # Improved prompt with specific instructions against repetition
-        local continue_prompt="The chapter below currently has ${current_words} words and must be expanded to at least ${min_words} words. 
+        local expansion_prompt="Expand the following chapter from approximately ${current_words} words to a final length of 2200-2500 words. The chapter should be a minimum of 2200 words.
 
-REQUIREMENTS:
-- Add approximately ${words_needed} more words
-- Expand existing ideas with more depth, examples, and explanations
-- Maintain the same style, tone, and voice as the original
-- Add substantive content, not just filler text
-- DO NOT repeat existing concepts or phrases
-- Avoid repetitive phrasing or redundant information
-- Create a natural flow with the existing content
-- Focus on depth rather than repetition
+**EXPANSION INSTRUCTIONS:**
 
-Here's the end of the current chapter:
+1.  **Deepen the 'Beyond Just Play' Introduction:** Elaborate on the societal pressures that devalue play. Discuss the historical shift from free play to structured activities and the cultural anxieties that drive this change. Add more specific, relatable examples of this phenomenon, such as the rise of 'academic' preschools or competitive extracurriculars.
 
-${content_to_send}"
+2.  **Enhance the 'Unveiling the Learning' Section:** For each of the three play examples (stones/leaves, fort-building, invisible friend), add at least three new paragraphs.
+    * **Stones & Leaves:** Go into more detail on the scientific inquiry aspect. Discuss how this simple act builds foundational skills for abstract concepts like geometry and chemistry.
+    * **Fort-building:** Expand on the collaboration and social dynamics. Provide a more detailed micro-narrative of two children negotiating roles, solving problems, and resolving conflict.
+    * **Invisible Friend:** Delve deeper into the emotional processing aspect. Explain how this type of symbolic play allows children to work through fears, express complex emotions, and develop a sense of self-agency. Use a specific, fictional example to illustrate this.
+
+3.  **Broaden the 'Silent Erosion' Section:** Strengthen the argument with additional context and evidence.
+    * **Statistics & Research:** Integrate specific, verifiable statistics and research findings from sources like the American Academy of Pediatrics to lend authority to your points. For example, mention the documented decline in unstructured play time or the link between screen time and reduced creativity.
+    * **Executive Functions:** Provide a more detailed explanation of executive functions (e.g., working memory, cognitive flexibility) and explicitly connect them to specific play scenarios.
+    * **The Comparison Trap:** Expand on the psychological impact of this anxiety on parents and children. Discuss how social media and standardized testing fuel this fear, creating a feedback loop of over-scheduling.
+
+4.  **Strengthen the 'Reclaiming Our Perspective' Section:** Add a more actionable, step-by-step guide for parents.
+    * **Creating a 'Prepared Environment':** Provide more concrete, budget-friendly examples of open-ended materials and explain the *philosophy* behind a curated play space. Explain the concept of 'less is more.'
+    * **The Role of Observation:** Offer more specific examples of what responsive observation looks like in practice (e.g., asking open-ended questions like 'Tell me about this' instead of 'What is that?').
+
+5.  **Maintain Flow and Cohesion:** Ensure all new content is woven seamlessly into the existing narrative. Do not use lists, bullet points, or new subheadings that break the flow. The prose should remain consistent with the original style and tone.
+
+Current chapter to be expanded:
+${current_chapter}"
+
+        # API rate limit delay
+        local jitter=$((RANDOM % 5))
+        show_wait_animation "$((DELAY_BETWEEN_CHAPTERS + jitter))" "Chapter cooldown"
 
         local cont_result
-        cont_result=$(smart_api_call "$continue_prompt" "$CHAPTER_SYSTEM_PROMPT" "chapter_extension" 0.7 "$extension_tokens" 1 "phi3:3.8b")
+        cont_result=$(smart_api_call "$expansion_prompt" "$CHAPTER_SYSTEM_PROMPT" "chapter_extension" 0.7 "$MAX_TOKENS" 1 "phi3:3.8b")
         if [ $? -ne 0 ] || [ -z "$cont_result" ]; then
             echo "⚠️ Auto-append attempt $attempt failed or returned empty"
             attempt=$((attempt + 1))
@@ -2180,7 +2179,7 @@ OUTPUT:
         
         if [ "$FINAL_WORD_COUNT" -lt "$MIN_WORDS" ]; then
             echo "⚠️ Final version still below minimum word count. Adding more content..."
-            append_until_min_words "$CHAPTER_FILE" "$MIN_WORDS"
+            expand_chapter "$CHAPTER_FILE" "$MIN_WORDS"
         elif [ "$FINAL_WORD_COUNT" -ge 2200 ]; then
             echo "✅ Chapter meets minimum length requirements, reviewing for quality..."
             # Simple review without the optimized handler
