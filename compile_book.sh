@@ -1560,13 +1560,15 @@ generate_ebook_format() {
                 fi
             fi
 
-            cat << EOF > "$EXPORTS_DIR/back-cover.tex"
-\usepackage{pdfpages}
+#             cat << EOF > "$EXPORTS_DIR/back-cover.tex"
+# \usepackage{pdfpages}
 
-\AtEndDocument{%
-  \includepdf[pages=-,scale=1.1]{back-cover.pdf}
-}
-EOF
+# \AtEndDocument{%
+#   \includepdf[pages=-,scale=1.2]{back-cover.pdf}
+# }
+# EOF
+
+                # -H back-cover.tex \
 
                 cat << 'EOF' > "$EXPORTS_DIR/titles.tex"
 \renewcommand{\maketitle}{}
@@ -1587,7 +1589,6 @@ EOF
                 --pdf-engine-opt='-interaction=nonstopmode' \
                 --pdf-engine-opt='-halt-on-error' \
                 --metadata-file="$(basename "$metadata")" \
-                -H back-cover.tex \
                 -H titles.tex \
                 -o "$(basename "$output_file")" "$(basename "$input_file")") && {
                 echo "✅ PDF created: $(basename "$output_file")"
