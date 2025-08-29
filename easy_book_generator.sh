@@ -826,7 +826,7 @@ generate_references_menu() {
         return
     fi
     
-    selected_dir="${book_dirs[$selection]}"
+    selected_dir="${book_dirs[$((selection-1))]}"
     book_name=$(basename "$selected_dir")
     
     echo
@@ -898,7 +898,7 @@ review_and_edit_book() {
             return
         fi
         
-        BOOK_DIR="${book_dirs[$selection]}"
+                BOOK_DIR="${book_dirs[$((selection-1))]}"
     fi
     
     echo ""
@@ -1171,7 +1171,7 @@ compile_manuscript() {
         return
     fi
     
-    selected_dir="${book_dirs[$selection]}"
+    selected_dir="${book_dirs[$((selection-1))]}"
     book_name=$(basename "$selected_dir")
     
     echo

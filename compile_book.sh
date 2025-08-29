@@ -76,11 +76,12 @@ ARGUMENTS:
     book_directory    - Directory containing outline and chapter files
                         (Optional: will auto-detect most recent book if omitted)
     output_format     - Format: all|epub|pdf|html|markdown|mobi|azw3 (default: all)
-    version          - Version: 1=original, 2=edited, 3=final (default: 1)
+    version          - Version: 1=original, 2=edited, 3=final (default: 3)
 
 OPTIONS:
     --author "Name"   - Set author name (default: AI-Assisted Author)
-    --cover "path"    - Path to cover image (JPG/PNG, min 1600x2560 pixels)
+    --cover "path"    - Path to cover image (JPG/PNG/PDF, min 1600x2560 pixels)
+    --backcover "path" - Path to back cover image (JPG/PNG/PDF, min 1600x2560 pixels)
     --isbn "number"   - Set ISBN for the book
     --publisher "name" - Set publisher name
     --year "YYYY"     - Publication year (default: current year)
@@ -90,7 +91,7 @@ EXAMPLES:
     $0                        # Auto-detect most recent book
     $0 all                    # Export most recent book in all formats
     $0 epub --author "Jane"   # Export as EPUB with custom author
-    $0 ./book_outputs/my-book epub 2 --cover "cover.jpg"   # Specify book and format
+    $0 ./book_outputs/my-book epub 2 --cover "cover.jpg" --backcover "backcover.pdf" # Specify book and format
 
 FEATURES:
     - Combines all chapters in order
@@ -106,13 +107,12 @@ EOF
 # Parse arguments with extended options support
 BOOK_DIR=""
 OUTPUT_FORMAT="all"  # Default to all formats
-VERSION="1"
+VERSION="3"
 COVER_IMAGE=""
 BACK_COVER=""
 AUTHOR="AI-Assisted Author"
 FAST=false
-COVER_IMAGE=""
-BACK_COVER=""
+BACK_COVER_IMAGE=""
 ISBN=""
 PUBLISHER="Speedy Quick Publishing"
 PUBLICATION_YEAR=$(date +"%Y")
@@ -139,7 +139,6 @@ date: "$PUBLICATION_YEAR"
 rights: "Copyright © $PUBLICATION_YEAR $AUTHOR. All rights reserved."
 language: "en-US"
 publisher: "$PUBLISHER"
-title: false
 identifier:
   - scheme: ISBN
     text: "${ISBN:-[No ISBN Provided]}"
@@ -149,6 +148,7 @@ header-includes:
   - \titleformat{\subsection}[block]{\bfseries\Large\centering}{}{0pt}{}
   - \let\cleardoublepage\clearpage
   - \renewcommand{\chapterbreak}{\clearpage}
+  - \usepackage[hidelinks]{hyperref}
   
 $([ -n "$cover_basename" ] && echo "cover-image: \"$cover_basename\"")
 ---
@@ -362,7 +362,7 @@ generate_book_cover() {
     fi
 
     COVER_IMAGE="$front_file"
-    BACK_COVER="$back_file"
+    BACK_COVER_IMAGE="$back_file"
     # ensure files saved with high quality
     $img_cmd "$front_file" -quality 95 "$front_file" 2>/dev/null || true
     $img_cmd "$back_file" -quality 95 "$back_file" 2>/dev/null || true
@@ -437,7 +437,7 @@ generate_book_cover() {
     echo "✅ Back cover created: $(basename "$back_file")"
 
     COVER_IMAGE="$front_file"
-    BACK_COVER="$back_file"
+    BACK_COVER_IMAGE="$back_file"
     return 0
 }
 
@@ -583,6 +583,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --cover)
             COVER_IMAGE="$2"
+            shift 2
+            ;;
+        --backcover)
+            BACK_COVER_IMAGE="$2"
             shift 2
             ;;
         --isbn)
@@ -906,6 +910,34 @@ if [ -n "$COVER_IMAGE" ] && [ -f "$COVER_IMAGE" ]; then
     echo "📄 Cover image prepared for ebook: $(basename "$COVER_IMAGE")"
 fi
 
+# Process back cover image if provided
+if [ -n "$BACK_COVER_IMAGE" ] && [ -f "$BACK_COVER_IMAGE" ]; then
+    echo "🖼️ Using provided back cover: $BACK_COVER_IMAGE"
+    cp "$BACK_COVER_IMAGE" "$EXPORTS_DIR/$(basename "$BACK_COVER_IMAGE")"
+    BACK_COVER_IMAGE="$EXPORTS_DIR/$(basename "$BACK_COVER_IMAGE")"
+elif [ "$ATTACH_BACK_COVER" = true ]; then
+    # Attempt to attach the provided cover image (path was set during args parsing)
+    attach_existing_cover "$BACK_COVER_IMAGE" "$EXPORTS_DIR" || true
+    if [ -n "$BACK_COVER_IMAGE" ] && [ -f "$BACK_COVER_IMAGE" ]; then
+        # If attach_existing_cover set BACK_COVER_IMAGE to exports path, ensure it is used
+        if [ "$BACK_COVER_IMAGE" != "$EXPORTS_DIR/$(basename "$BACK_COVER_IMAGE")" ]; then
+            # ensure it's copied into exports dir
+            cp -f "$BACK_COVER_IMAGE" "$EXPORTS_DIR/" 2>/dev/null || true
+            BACK_COVER_IMAGE="$EXPORTS_DIR/$(basename "$BACK_COVER_IMAGE")"
+        fi
+    fi
+fi
+
+# Ensure back cover image is properly set up before creating metadata
+if [ -n "$BACK_COVER_IMAGE" ] && [ -f "$BACK_COVER_IMAGE" ]; then
+    # Copy cover to exports directory if needed
+    if [ "$BACK_COVER_IMAGE" != "$EXPORTS_DIR/$(basename "$BACK_COVER_IMAGE")" ]; then
+        cp "$BACK_COVER_IMAGE" "$EXPORTS_DIR/"
+    fi
+    BACK_COVER_IMAGE="$EXPORTS_DIR/$(basename "$BACK_COVER_IMAGE")"
+    echo "📄 Back cover image prepared for ebook: $(basename "$BACK_COVER_IMAGE")"
+fi
+
 # Create metadata file for ebook exports
 METADATA_FILE=$(generate_metadata "$BOOK_TITLE" "$EXPORTS_DIR")
 
@@ -924,7 +956,7 @@ header-includes:
   - \titleformat{\subsection}[block]{\bfseries\Large\centering}{}{0pt}{}
 ---
 
-\renewcommand{\contentsname}{Table of Contents}
+\renewcommand{\contentsname}{\Huge Table of Contents}
 \thispagestyle{empty}
 \newpage
 \thispagestyle{empty}
@@ -973,7 +1005,7 @@ All rights reserved. No part of this publication may be reproduced, distributed,
 
 \clearpage
 
-\setcounter{tocdepth}{1}
+\setcounter{tocdepth}{2}
 \tableofcontents
 
 \clearpage
@@ -1036,10 +1068,10 @@ for CHAPTER_FILE in "${CHAPTER_FILES[@]}"; do
         CHAPTER_SUBTITLE=$(echo "$CLEAN_CHAPTER_TITLE" | cut -d: -f2- | sed 's/^ *//; s/ *$//')
 
         # H1: chapter anchor/title (keeps numbering for TOC)
-        echo "## Chapter $CHAPTER_NUM {.unnumbered .unlisted}" >> "$MANUSCRIPT_FILE"
+        echo "# Chapter $CHAPTER_NUM" >> "$MANUSCRIPT_FILE"
         echo "" >> "$MANUSCRIPT_FILE"
         # H2: actual chapter title
-        echo "# $CHAPTER_MAIN_TITLE {.chapter-main-title}" >> "$MANUSCRIPT_FILE"
+        echo "## $CHAPTER_MAIN_TITLE {.chapter-main-title}" >> "$MANUSCRIPT_FILE"
         # H3: subtitle (optional)
         if [ -n "$CHAPTER_SUBTITLE" ]; then
             echo "" >> "$MANUSCRIPT_FILE"
@@ -1141,6 +1173,46 @@ done
 
 echo ""
 
+# Function: insert extra sections (epilogue, glossary, discussion, appendices)
+insert_extra_sections() {
+    local base_dir="$BOOK_DIR"
+    local files=("epilogue.md" "glossary.md" "discussion.md" "appendices.md")
+    for f in "${files[@]}"; do
+        path="$base_dir/$f"
+        if [ -f "$path" ]; then
+        TITLE=$(grep -m1 -E '^# ' "$path" | sed 's/^# *//')
+        [ -z "$TITLE" ] && TITLE="${f%.*}"  
+            echo "📎 Inserting extra section: $f"
+            echo "\pagebreak" >> "$MANUSCRIPT_FILE"
+            echo "\newpage" >> "$MANUSCRIPT_FILE"
+            echo "" >> "$MANUSCRIPT_FILE"
+            echo "# $TITLE" >> "$MANUSCRIPT_FILE"
+            echo "" >> "$MANUSCRIPT_FILE"
+            # Remove title from the path file
+            tail -n +2 "$path" >> "$MANUSCRIPT_FILE"
+            echo "\pagebreak" >> "$MANUSCRIPT_FILE"
+            if [ "$path" == "$base_dir/epilogue.md" ]; then
+                # Add a simple end note to the manuscript instead
+                cat << EOF >> "$MANUSCRIPT_FILE"
+\pagebreak
+\vspace{10cm}
+\begin{center}
+\textnormal{---------------------------------------------}
+\end{center}
+\begin{center}
+\textit{Copyright © $PUBLICATION_YEAR $AUTHOR. All rights reserved.}
+\end{center}
+\begin{center}
+\textit{Published by $PUBLISHER}
+\end{center}
+EOF
+            fi
+        fi
+    done
+}
+
+insert_extra_sections
+
 # Create a separate metadata file instead of adding it to the manuscript
 METADATA_STATS_FILE="${EXPORTS_DIR}/book_metadata_stats.md"
 
@@ -1237,22 +1309,6 @@ cat << EOF >> "$METADATA_STATS_FILE"
 - **Compilation Date:** $(date)
 EOF
 
-# Add a simple end note to the manuscript instead
-cat << EOF >> "$MANUSCRIPT_FILE"
-\pagebreak
-
-\vspace{10cm}
-\begin{center}
-\textnormal{---------------------------------------------}
-\end{center}
-\begin{center}
-\textit{Copyright © $PUBLICATION_YEAR $AUTHOR. All rights reserved.}
-\end{center}
-\begin{center}
-\textit{Published by $PUBLISHER}
-\end{center}
-EOF
-
 # If a generated bibliography exists (from generate_references.sh), append it here
 BIB_FILE="$BOOK_DIR/final_bibliography.md"
 if [ -f "$BIB_FILE" ]; then
@@ -1261,6 +1317,24 @@ if [ -f "$BIB_FILE" ]; then
 else
     echo "ℹ️ No generated bibliography found at $BIB_FILE"
 fi
+
+cat << EOF >> "$MANUSCRIPT_FILE"
+\pagebreak
+\begin{center}
+\section{References}
+\end{center}
+EOF
+
+cat "$BIB_FILE" >> "$MANUSCRIPT_FILE"
+
+cat << EOF >> "$MANUSCRIPT_FILE"
+\begin{center}
+\textit{Copyright © $PUBLICATION_YEAR $AUTHOR. All rights reserved.}
+\end{center}
+\begin{center}
+\textit{Published by $PUBLISHER}
+\end{center}
+EOF
 
 cat << EOF >> "$MANUSCRIPT_FILE"
 \pagebreak
@@ -1286,13 +1360,20 @@ Elara Morgan is a passionate non-fiction author dedicated to exploring the intri
 \vspace{2cm}
 
 \pagebreak
-\begin{center}
-\section{References}
-\vspace{2cm}
-\end{center}
-EOF
 
-cat "$BIB_FILE" >> "$MANUSCRIPT_FILE"
+\clearpage\vspace*{\fill}
+\centering
+$(if [ -f "$EXPORTS_DIR/$LOGO_BASENAME" ]; then echo "![]($LOGO_BASENAME){ width=25% } "; fi)
+\raggedright
+\flushleft
+
+$(if [ -n "$ISBN" ]; then echo "ISBN: $ISBN"; fi)
+\centerline{\textbf{Copyright Notice}}
+
+All intellectual property rights, including copyrights, in this book are owned by $PUBLISHER and/or the author. This work is protected under national and international copyright laws. Any unauthorized reproduction, distribution, or public display of this material is strictly prohibited. For permission requests, please contact the $PUBLISHER.
+\centerline{\textnormal{Copyright © $PUBLICATION_YEAR $AUTHOR}}
+\centerline{\textnormal{$PUBLISHER}}
+EOF
 
 # If a back cover was generated, include it as the final page
 if [ -n "$BACK_COVER" ] && [ -f "$BACK_COVER" ]; then
@@ -1452,19 +1533,62 @@ generate_ebook_format() {
 # }
 # EOF
 
-            cat << 'EOF' > "$EXPORTS_DIR/disable-title.tex"
+            # Prepare latex helpers and optionally include back cover if present and is .jpg or .png
+            if [ -n "$BACK_COVER_IMAGE" ] && [ -f "$BACK_COVER_IMAGE" ] && [[ "$BACK_COVER_IMAGE" == *.jpg || "$BACK_COVER_IMAGE" == *.png ]]; then
+                backcover="$(basename "$BACK_COVER_IMAGE")"
+
+                # Guard against extremely large images which can stall lualatex
+                if command -v identify >/dev/null 2>&1 && command -v convert >/dev/null 2>&1; then
+                    dims=$(identify -format "%w %h" "$BACK_COVER_IMAGE" 2>/dev/null || true)
+                    width=$(echo "$dims" | awk '{print $1}')
+                    height=$(echo "$dims" | awk '{print $2}')
+                    # Resize to proportional with max width/height
+                    maxdim=3000
+                    if [ -n "$width" ] && [ -n "$height" ] && ( [ "$width" -gt $maxdim ] || [ "$height" -gt $maxdim ] ); then
+                        echo "⚠️ Back cover image large (${width}x${height}), resizing to avoid lualatex stalls"
+                        # Calculate proportional dimensions
+                        if [ "$width" -gt "$height" ]; then
+                            newwidth=$maxdim
+                            newheight=$((height * maxdim / width))
+                        else
+                            newheight=$maxdim
+                            newwidth=$((width * maxdim / height))
+                        fi
+                        echo "⚠️ Resizing back cover image to ${newwidth}x${newheight}"
+                        convert "$BACK_COVER_IMAGE" -resize ${newwidth}x${newheight}\> "$BACK_COVER_IMAGE" 2>/dev/null || true
+                    fi
+                fi
+            fi
+
+            cat << EOF > "$EXPORTS_DIR/back-cover.tex"
+\usepackage{pdfpages}
+
+\AtEndDocument{%
+  \includepdf[pages=-,scale=1.1]{back-cover.pdf}
+}
+EOF
+
+                cat << 'EOF' > "$EXPORTS_DIR/titles.tex"
 \renewcommand{\maketitle}{}
 \usepackage{titlesec}
+\usepackage{tocloft}
+
+\cftpagenumbersoff{section}
+\cftpagenumberson{subsection}
+
 \titleformat{\section}{\fontsize{28}{32}\selectfont\bfseries}{\thesection}{1em}{}
 \titleformat{\subsection}{\fontsize{20}{24}\selectfont\bfseries}{\thesubsection}{1em}{}
 \titleformat{\subsubsection}{\fontsize{14}{18}\selectfont\bfseries}{\thesubsubsection}{1em}{}
 EOF
-            # -H cover.tex \
-            # Try direct PDF generation first (simplest approach)
+
+            # Try direct PDF generation first (run lualatex non-interactively to avoid hangs)
             (cd "$output_dir" && pandoc -f markdown -t pdf \
                 --pdf-engine=lualatex \
+                --pdf-engine-opt='-interaction=nonstopmode' \
+                --pdf-engine-opt='-halt-on-error' \
                 --metadata-file="$(basename "$metadata")" \
-                -H disable-title.tex \
+                -H back-cover.tex \
+                -H titles.tex \
                 -o "$(basename "$output_file")" "$(basename "$input_file")") && {
                 echo "✅ PDF created: $(basename "$output_file")"
                 return 0
