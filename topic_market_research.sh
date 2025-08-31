@@ -1231,6 +1231,8 @@ for i, (query, score, comp, rec) in enumerate(opportunities[:5], 1):
 "
 }
 
+# Get and pass topics/keywords to compile_book.sh
+
 # Monitor trending topics
 monitor_trends() {
     echo -e "${BLUE}📈 Trend Monitoring Setup${NC}"

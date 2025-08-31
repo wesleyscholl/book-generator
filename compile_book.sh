@@ -130,13 +130,13 @@ generate_metadata() {
     if [ -n "$COVER_IMAGE" ] && [ -f "$COVER_IMAGE" ]; then
         cover_basename=$(basename "$COVER_IMAGE")
     fi
+
+# date: "$PUBLICATION_YEAR"
     
     cat > "$metadata_file" << EOF
 ---
 title: "$title"
 author: "$AUTHOR"
-date: "$PUBLICATION_YEAR"
-rights: "Copyright © $PUBLICATION_YEAR $AUTHOR. All rights reserved."
 language: "en-US"
 publisher: "$PUBLISHER"
 identifier:
@@ -940,16 +940,25 @@ fi
 
 # Create metadata file for ebook exports
 METADATA_FILE=$(generate_metadata "$BOOK_TITLE" "$EXPORTS_DIR")
+# Extract subtitle for layout
+SUB_TITLE=$(head -n 2 "$OUTLINE_FILE" | tail -n 1 | sed 's/^## //; s/^SUBTITLE:[[:space:]]*//' | tr -d '\r')
 
+# Extract keywords for layout
+# KEYWORDS=$(head -n 3 "$OUTLINE_FILE" | tail -n 1 | sed 's/^## //; s/^KEYWORDS:[[:space:]]*//' | tr -d '\r')
+
+# date: "$PUBLICATION_YEAR"
 # Start manuscript with complete front matter using markdown and LaTeX page breaks
 cat << EOF > "$MANUSCRIPT_FILE"
 ---
 title: "$BOOK_TITLE"
+subtitle: "$SUB_TITLE"
 author: "$AUTHOR"
-date: "$PUBLICATION_YEAR"
-titlepage: false
 rights: "Copyright © $PUBLICATION_YEAR $AUTHOR"
 language: "en-US"
+publisher: "$PUBLISHER"
+description: "$DESCRIPTION"
+subject: ""
+toc-title: "Table of Contents"
 header-includes:
   - \usepackage{titlesec}
   - \titleformat{\section}[block]{\bfseries\Huge\centering}{}{0pt}{}
@@ -962,6 +971,10 @@ header-includes:
 \thispagestyle{empty}
 \clearpage\vspace*{\fill}
 
+::: {.titlepage}
+![]($EXPORTS_DIR/playfulpath.png)
+\vspace{2em}
+:::
 \begin{center}
 {\fontsize{28}{32}\selectfont\bfseries $BOOK_TITLE}
 \end{center}
@@ -983,23 +996,30 @@ header-includes:
 \end{center}
 
 \centering
-$(if [ -f "$EXPORTS_DIR/$LOGO_BASENAME" ]; then echo "![]($LOGO_BASENAME){ width=40% } "; fi)
+::: {.logo}
+$(if [ -f "$EXPORTS_DIR/playfulpath.png" ]; then echo "![](playfulpath.png){ width=40% } "; fi)
+:::
 \raggedright
 \flushleft
 \vspace*{\fill}\clearpage
 
 \newpage
 
+::: {.copyright}
 \clearpage\vspace*{\fill}
 \centering
+::: {.logo}
 $(if [ -f "$EXPORTS_DIR/$LOGO_BASENAME" ]; then echo "![]($LOGO_BASENAME){ width=75% } "; fi)
+:::
 \raggedright
 \flushleft
 
 $(if [ -n "$ISBN" ]; then echo "ISBN: $ISBN"; fi)
+
 All rights reserved. No part of this publication may be reproduced, distributed, or transmitted in any form or by any means, including photocopying, recording, or other electronic or mechanical methods, without the prior written permission of the publisher.
 \centerline{\textnormal{Copyright © $PUBLICATION_YEAR $AUTHOR}}
 \centerline{\textnormal{$PUBLISHER}}
+:::
 
 \newpage
 
@@ -1443,6 +1463,9 @@ h3 {
 .title { font-size: 28pt; text-align: center; }
 .author { font-size: 16pt; text-align: center; }
 .date { font-size: 14pt; text-align: center; }
+.publisher { font-size: 14pt; text-align: center; }
+.rights { font-size: 14pt; text-align: center; }
+.logo { text-align: center; margin: 3em auto; page-break-after: always; }
 p {
   margin-bottom: 15px;
   orphans: 3;
@@ -1451,6 +1474,40 @@ p {
 .chapter {
   display: block;
   height: 50px;
+}
+.titlepage {
+  text-align: center;
+  margin-top: 20%;
+  page-break-after: always;
+}
+.titlepage h1 {
+  font-size: 2.5em;
+  font-weight: bold;
+  margin-bottom: 1em;
+}
+.titlepage h2 {
+  font-size: 1.8em;
+  font-weight: bold;
+  margin-bottom: 3em;
+}
+.titlepage p {
+  font-size: 1.2em;
+  margin: 0.5em 0;
+}
+.copyright {
+  text-align: center;
+  margin: 10% auto;
+  font-size: 0.9em;
+  line-height: 1.5;
+  page-break-after: always;
+}
+h1:contains('Table of Contents') {
+  font-size: 2em;
+  text-align: center;
+  margin-top: 30%;
+}
+#TOC ol ol {
+  list-style-type: none;
 }
 "
 
@@ -1493,22 +1550,105 @@ generate_ebook_format() {
                 cover=""
             fi
             
-            # Generate EPUB with cover if we have one
-            if [ -n "$cover" ] && [ -f "$cover" ]; then
-                # Run pandoc from the output directory so image paths resolve correctly
-                (cd "$output_dir" && pandoc -f markdown -t epub3 \
-                    --epub-cover-image="$(basename "$cover")" \
-                    --css="$(basename "$css")" \
-                    --metadata-file="$(basename "$metadata")" \
-                    --split-level=1 \
-                    -o "$(basename "$output_file")" "$(basename "$input_file")")
-            else
-                # Run pandoc from the output directory so image paths resolve correctly
-                (cd "$output_dir" && pandoc -f markdown -t epub3 \
-                    --css="$(basename "$css")" \
-                    --metadata-file="$(basename "$metadata")" \
-                    --split-level=1 \
-                    -o "$(basename "$output_file")" "$(basename "$input_file")")
+            # Build pandoc input list and options so EPUB matches PDF manuscript
+            input_basename="$(basename "$input_file")"
+            css_basename="$(basename "$css")"
+            metadata_basename="$(basename "$metadata")"
+            cover_basename=""
+            [ -n "$cover" ] && cover_basename="$(basename "$cover")"
+
+                        # Split manuscript into a title/front-matter piece and body so we can insert a publisher page after the title
+                        title_md="$output_dir/_epub_title.md"
+                        body_md="$output_dir/_epub_body.md"
+                        back_md=""
+
+                        # If the manuscript contains a \tableofcontents marker, split at that line
+                        if grep -n -m1 '^\\tableofcontents' "$input_file" >/dev/null 2>&1; then
+                                toc_line=$(grep -n -m1 '^\\tableofcontents' "$input_file" | cut -d: -f1)
+                                # title part: lines 1..(toc_line-1)
+                                sed -n "1,$((toc_line-1))p" "$input_file" > "$title_md" || true
+                                # body part: from toc_line to end (include TOC)
+                                sed -n "${toc_line},\$p" "$input_file" > "$body_md" || true
+                        else
+                                # Fallback: leave title empty and use full manuscript as body
+                                : > "$title_md"
+                                cp "$input_file" "$body_md"
+                        fi
+
+                        # Create a publisher HTML page to appear after the title page in EPUB
+                        publisher_html="$output_dir/_epub_publisher.html"
+                        if [ ! -f "$publisher_html" ]; then
+                                cat > "$publisher_html" << HTML_EOF
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width,initial-scale=1" />
+        <title>Publisher</title>
+        <style>
+            body { font-family: serif; text-align: center; margin: 2in 0; }
+            .publisher { font-size: 1.2em; margin-top: 1.5em; }
+            .logo { margin-top: 2.5em; }
+        </style>
+    </head>
+    <body>
+        <h1 class="title">${BOOK_TITLE:-}</h1>
+        <div class="publisher">${PUBLISHER:-}</div>
+        <div class="logo">
+        $(if [ -f "$EXPORTS_DIR/$LOGO_BASENAME" ]; then echo "<img src=\"$LOGO_BASENAME\" alt=\"Publisher logo\" style=\"max-width:40%;height:auto;\">"; fi)
+        </div>
+    </body>
+</html>
+HTML_EOF
+                        fi
+
+                        # Prepare a temporary back-cover markdown file if a back cover image exists in the output dir
+                        if [ -n "$BACK_COVER_IMAGE" ] && [ -f "$output_dir/$(basename "$BACK_COVER_IMAGE")" ]; then
+                                back_basename="$(basename "$BACK_COVER_IMAGE")"
+                                back_md="$output_dir/_backcover_insert.md"
+                                if [ ! -f "$back_md" ]; then
+                                        printf "\n\n![](%s)\n" "$back_basename" > "$back_md"
+                                fi
+                        fi
+
+            # Run pandoc from the output directory so image paths resolve correctly. Use --toc and set chapter level
+            (cd "$output_dir" && {
+                if [ -n "$cover_basename" ]; then
+                    if [ -n "$back_md" ]; then
+                        pandoc -f markdown -t epub3 \
+                            --epub-cover-image="$cover_basename" \
+                            --css="$css_basename" \
+                            --metadata-file="$metadata_basename" \
+                            --toc --toc-depth=2 --resource-path=. \
+                            --split-level=2 -o "$(basename "$output_file")" "$input_basename" "$(basename "$back_md")"
+                    else
+                        pandoc -f markdown -t epub3 \
+                            --epub-cover-image="$cover_basename" \
+                            --css="$css_basename" \
+                            --metadata-file="$metadata_basename" \
+                            --toc --toc-depth=2 --resource-path=. \
+                            --split-level=2 -o "$(basename "$output_file")" "$input_basename"
+                    fi
+                else
+                    if [ -n "$back_md" ]; then
+                        pandoc -f markdown -t epub3 \
+                            --css="$css_basename" \
+                            --metadata-file="$metadata_basename" \
+                            --toc --toc-depth=2 --resource-path=. \
+                            --split-level=2 -o "$(basename "$output_file")" "$input_basename" "$(basename "$back_md")"
+                    else
+                        pandoc -f markdown -t epub3 \
+                            --css="$css_basename" \
+                            --metadata-file="$metadata_basename" \
+                            --toc --toc-depth=2 --resource-path=. \
+                            --split-level=2 -o "$(basename "$output_file")" "$input_basename"
+                    fi
+                fi
+            })
+
+            # Clean up temporary backcover md if we created one
+            if [ -n "$back_md" ] && [ -f "$back_md" ]; then
+                rm -f "$back_md" || true
             fi
             
             echo "✅ EPUB created: $(basename "$output_file")"

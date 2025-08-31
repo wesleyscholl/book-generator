@@ -1569,6 +1569,8 @@ extract_chapters() {
 if [ -z "$CHAPTERS_ONLY" ]; then
     echo "📋 Step 1: Generating book outline..."
     
+    # Add a topics & keywords section for book metadata and compilation 
+
     SYSTEM_PROMPT=$(cat << 'EOF'
 You are a professional book author and publishing consultant specializing in creating structured, commercially viable book outlines. Your outlines are used for generating 20,000-25,000 word books, so they must be comprehensive, precise, and follow the EXACT format without deviation.
 
