@@ -136,9 +136,12 @@ generate_metadata() {
     cat > "$metadata_file" << EOF
 ---
 title: "$title"
+subtitle: "$SUB_TITLE"
 author: "$AUTHOR"
+rights: "Copyright © $PUBLICATION_YEAR $AUTHOR"
 language: "en-US"
 publisher: "$PUBLISHER"
+geometry: margin=1in
 identifier:
   - scheme: ISBN
     text: "${ISBN:-[No ISBN Provided]}"
@@ -856,6 +859,12 @@ if [ -f "$AUTHOR_PHOTO_SRC" ]; then
 fi
 AUTHOR_PHOTO_BASENAME="$(basename "$AUTHOR_PHOTO_SRC")"
 
+ICON_PHOTO_SRC="$SCRIPT_DIR/icon.png"
+if [ -f "$ICON_PHOTO_SRC" ]; then
+    cp -f "$ICON_PHOTO_SRC" "$EXPORTS_DIR/$(basename "$ICON_PHOTO_SRC")" 2>/dev/null || true
+fi
+ICON_BASENAME="$(basename "$ICON_PHOTO_SRC")"
+
 echo "📑 Creating manuscript: $(basename "$MANUSCRIPT_FILE")"
 
 # Generate random author pen name if requested
@@ -946,24 +955,30 @@ SUB_TITLE=$(head -n 2 "$OUTLINE_FILE" | tail -n 1 | sed 's/^## //; s/^SUBTITLE:[
 # Extract keywords for layout
 # KEYWORDS=$(head -n 3 "$OUTLINE_FILE" | tail -n 1 | sed 's/^## //; s/^KEYWORDS:[[:space:]]*//' | tr -d '\r')
 
+# $BOOK_TITLE
+
+
 # date: "$PUBLICATION_YEAR"
 # Start manuscript with complete front matter using markdown and LaTeX page breaks
+
+# ---
+# title: "$BOOK_TITLE"
+# subtitle: "$SUB_TITLE"
+# author: "$AUTHOR"
+# rights: "Copyright © $PUBLICATION_YEAR $AUTHOR"
+# language: "en-US"
+# publisher: "$PUBLISHER"
+# description: "$DESCRIPTION"
+# subject: ""
+# toc-title: "Table of Contents"
+# header-includes:
+#   - \usepackage{titlesec}
+#   - \titleformat{\section}[block]{\bfseries\Huge\centering}{}{0pt}{}
+#   - \titleformat{\subsection}[block]{\bfseries\Large\centering}{}{0pt}{}
+# ---
+
 cat << EOF > "$MANUSCRIPT_FILE"
----
-title: "$BOOK_TITLE"
-subtitle: "$SUB_TITLE"
-author: "$AUTHOR"
-rights: "Copyright © $PUBLICATION_YEAR $AUTHOR"
-language: "en-US"
-publisher: "$PUBLISHER"
-description: "$DESCRIPTION"
-subject: ""
-toc-title: "Table of Contents"
-header-includes:
-  - \usepackage{titlesec}
-  - \titleformat{\section}[block]{\bfseries\Huge\centering}{}{0pt}{}
-  - \titleformat{\subsection}[block]{\bfseries\Large\centering}{}{0pt}{}
----
+
 
 \renewcommand{\contentsname}{\Huge Table of Contents}
 \thispagestyle{empty}
@@ -971,29 +986,17 @@ header-includes:
 \thispagestyle{empty}
 \clearpage\vspace*{\fill}
 
-::: {.titlepage}
-![]($EXPORTS_DIR/playfulpath.png)
-\vspace{2em}
-:::
+$(if [ -f "$EXPORTS_DIR/$ICON_BASENAME" ]; then echo "![]($ICON_BASENAME){ width=40% } "; fi)
+
 \begin{center}
-{\fontsize{28}{32}\selectfont\bfseries $BOOK_TITLE}
+{\fontsize{28}{32}\selectfont\bfseries }
 \end{center}
 
 \vspace{4em}
 
-\begin{center}
-{\fontsize{20}{24}\selectfont\bfseries $SUB_TITLE}
-\end{center}
-
-\vspace{12em}
-
-\begin{center}
-{\fontsize{14}{18}\selectfont\bfseries By $AUTHOR}
-\end{center}
-
-\begin{center}
-{\normalsize © $PUBLICATION_YEAR}
-\end{center}
+## $SUB_TITLE
+### By $AUTHOR
+#### Copyright © $PUBLICATION_YEAR
 
 \centering
 ::: {.logo}
@@ -1005,20 +1008,28 @@ $(if [ -f "$EXPORTS_DIR/playfulpath.png" ]; then echo "![](playfulpath.png){ wid
 
 \newpage
 
+::: {.pagebreak}
+:::
+::: {.fillspace}
+:::
 ::: {.copyright}
 \clearpage\vspace*{\fill}
 \centering
-::: {.logo}
-$(if [ -f "$EXPORTS_DIR/$LOGO_BASENAME" ]; then echo "![]($LOGO_BASENAME){ width=75% } "; fi)
-:::
-\raggedright
-\flushleft
+$(if [ -f "$EXPORTS_DIR/$LOGO_BASENAME" ]; then echo "![]($LOGO_BASENAME){ width=25% } "; fi)
 
 $(if [ -n "$ISBN" ]; then echo "ISBN: $ISBN"; fi)
 
+<!-- Copyright section without heading -->
+<span class="copyright-notice">Copyright Notice</span>
+
 All rights reserved. No part of this publication may be reproduced, distributed, or transmitted in any form or by any means, including photocopying, recording, or other electronic or mechanical methods, without the prior written permission of the publisher.
-\centerline{\textnormal{Copyright © $PUBLICATION_YEAR $AUTHOR}}
-\centerline{\textnormal{$PUBLISHER}}
+
+**Copyright © $PUBLICATION_YEAR $AUTHOR**
+
+**$PUBLISHER**
+
+\raggedright
+\flushleft
 :::
 
 \newpage
@@ -1027,10 +1038,6 @@ All rights reserved. No part of this publication may be reproduced, distributed,
 
 \setcounter{tocdepth}{2}
 \tableofcontents
-
-\clearpage
-
-\newpage
 
 EOF
 
@@ -1052,11 +1059,18 @@ for CHAPTER_FILE in "${CHAPTER_FILES[@]}"; do
     echo "📝 Processing Chapter $CHAPTER_NUM..."
 
     # Add chapter anchor and proper page break for ebook formats
-    echo "" >> "$MANUSCRIPT_FILE"
-    echo "\newpage" >> "$MANUSCRIPT_FILE"
-    echo "" >> "$MANUSCRIPT_FILE"
-    echo "<a id=\"chapter-$CHAPTER_NUM\" class=\"chapter\"></a>" >> "$MANUSCRIPT_FILE"
-    echo "" >> "$MANUSCRIPT_FILE"
+    # For first chapter, don't add extra newpage since we're coming from TOC
+    if [ $CHAPTER_COUNTER -eq 1 ]; then
+        echo "" >> "$MANUSCRIPT_FILE"
+        echo "<a id=\"chapter-$CHAPTER_NUM\" class=\"chapter\"></a>" >> "$MANUSCRIPT_FILE"
+        echo "" >> "$MANUSCRIPT_FILE"
+    else
+        echo "" >> "$MANUSCRIPT_FILE"
+        echo "\newpage" >> "$MANUSCRIPT_FILE"
+        echo "" >> "$MANUSCRIPT_FILE"
+        echo "<a id=\"chapter-$CHAPTER_NUM\" class=\"chapter\"></a>" >> "$MANUSCRIPT_FILE"
+        echo "" >> "$MANUSCRIPT_FILE"
+    fi
 
     # Look up chapter display title from the outline to avoid duplicated titles
     # First try markdown format (### Chapter N: Title)
@@ -1087,21 +1101,16 @@ for CHAPTER_FILE in "${CHAPTER_FILES[@]}"; do
         CHAPTER_MAIN_TITLE=$(echo "$CLEAN_CHAPTER_TITLE" | cut -d: -f1 | sed 's/^ *//; s/ *$//')
         CHAPTER_SUBTITLE=$(echo "$CLEAN_CHAPTER_TITLE" | cut -d: -f2- | sed 's/^ *//; s/ *$//')
 
-        # H1: chapter anchor/title (keeps numbering for TOC)
-        echo "# Chapter $CHAPTER_NUM" >> "$MANUSCRIPT_FILE"
+        # Use a single heading section for all title information
+        echo "# Chapter $CHAPTER_NUM: $CHAPTER_MAIN_TITLE {.chapter-title}" >> "$MANUSCRIPT_FILE"
         echo "" >> "$MANUSCRIPT_FILE"
-        # H2: actual chapter title
-        echo "## $CHAPTER_MAIN_TITLE {.chapter-main-title}" >> "$MANUSCRIPT_FILE"
         # H3: subtitle (optional)
         if [ -n "$CHAPTER_SUBTITLE" ]; then
-            echo "" >> "$MANUSCRIPT_FILE"
             echo "### $CHAPTER_SUBTITLE {.chapter-subtitle}" >> "$MANUSCRIPT_FILE"
         fi
     else
-        # No colon found: H1 = Chapter N, H2 = full chapter title
-        echo "# Chapter $CHAPTER_NUM {.chapter-title .unnumbered .unlisted}" >> "$MANUSCRIPT_FILE"
-        echo "" >> "$MANUSCRIPT_FILE"
-        echo "## $CLEAN_CHAPTER_TITLE {.chapter-main-title}" >> "$MANUSCRIPT_FILE"
+        # No colon found: Single H1 with full title
+        echo "# Chapter $CHAPTER_NUM: $CLEAN_CHAPTER_TITLE {.chapter-title}" >> "$MANUSCRIPT_FILE"
     fi
     echo "" >> "$MANUSCRIPT_FILE"
 
@@ -1343,6 +1352,11 @@ cat << EOF >> "$MANUSCRIPT_FILE"
 \begin{center}
 \section{References}
 \end{center}
+::: {.pagebreak}
+:::
+::: {.newpage}
+:::
+# References
 EOF
 
 cat "$BIB_FILE" >> "$MANUSCRIPT_FILE"
@@ -1358,7 +1372,10 @@ EOF
 
 cat << EOF >> "$MANUSCRIPT_FILE"
 \pagebreak
-
+::: {.pagebreak}
+:::
+::: {.newpage}
+:::
 ## Author Bio {.unlisted .unnumbered}
 
 EOF
@@ -1367,45 +1384,65 @@ EOF
 if [ -f "$AUTHOR_PHOTO_BASENAME" ]; then
   cat << EOF >> "$MANUSCRIPT_FILE"
 
-\includegraphics[width=0.5\\textwidth]{$AUTHOR_PHOTO_BASENAME}
+$(if [ -f "$EXPORTS_DIR/$AUTHOR_PHOTO_BASENAME" ]; then echo "![]($AUTHOR_PHOTO_BASENAME){ width=50% } "; fi)
+
 
 EOF
 fi
+# \includegraphics[width=0.5\\textwidth]{$AUTHOR_PHOTO_BASENAME}
 
 cat << EOF >> "$MANUSCRIPT_FILE"
 \vspace{1cm}
 
-Elara Morgan is a passionate non-fiction author dedicated to exploring the intricacies of human experience and the world around us. With a keen eye for detail and a talent for making complex topics accessible, Elara's writing invites readers on a journey of discovery. When she's not immersed in research or crafting her next book, Elara enjoys hiking, gardening, and spending time with her family in Portsmouth, New Hampshire.
+
+Elara Morgan is a passionate non-fiction author who explores the intricacies of human experience and the world around us. With a gift for making complex topics accessible, she bridges the gap between academic research and everyday life, empowering readers with knowledge that is both insightful and practical. Drawing on her background in education and the humanities, she distills ideas into engaging narratives that resonate widely. Her books are praised for their clarity, warmth, and thoughtful challenges to conventional wisdom. Beyond writing, Elara finds inspiration in nature—hiking New Hampshire's trails, tending her garden, and cherishing family time in Portsmouth. These pursuits ground her while fueling her creativity, making her life and work a testament to curiosity and the joy of discovery.
 
 \vspace{2cm}
 
+::: {.pagebreak}
+:::
 \pagebreak
 
 \clearpage\vspace*{\fill}
+::: {.fillspace}
+:::
+::: {.copyright}
 \centering
 $(if [ -f "$EXPORTS_DIR/$LOGO_BASENAME" ]; then echo "![]($LOGO_BASENAME){ width=25% } "; fi)
 \raggedright
 \flushleft
 
+\centering
 $(if [ -n "$ISBN" ]; then echo "ISBN: $ISBN"; fi)
-\centerline{\textbf{Copyright Notice}}
+
+**Copyright Notice**
 
 All intellectual property rights, including copyrights, in this book are owned by $PUBLISHER and/or the author. This work is protected under national and international copyright laws. Any unauthorized reproduction, distribution, or public display of this material is strictly prohibited. For permission requests, please contact the $PUBLISHER.
-\centerline{\textnormal{Copyright © $PUBLICATION_YEAR $AUTHOR}}
-\centerline{\textnormal{$PUBLISHER}}
+
+**Copyright © $PUBLICATION_YEAR $AUTHOR**
+
+**$PUBLISHER**
+\raggedright
+\flushleft
+:::
+
+::: {.pagebreak}
+:::
+
+![](back-cover.png)
 EOF
 
 # If a back cover was generated, include it as the final page
-if [ -n "$BACK_COVER" ] && [ -f "$BACK_COVER" ]; then
-    echo "" >> "$MANUSCRIPT_FILE"
-    echo "" >> "$MANUSCRIPT_FILE"
-    echo "![]($(basename "$BACK_COVER"))" >> "$MANUSCRIPT_FILE"
-    echo "\thispagestyle{empty}" >> "$MANUSCRIPT_FILE"
-    # Copy back cover to exports directory only if different
-    if [ "$BACK_COVER" != "$EXPORTS_DIR/$(basename "$BACK_COVER")" ]; then
-        cp "$BACK_COVER" "$EXPORTS_DIR/"
-    fi
-fi
+# if [ -n "$BACK_COVER" ] && [ -f "$BACK_COVER" ]; then
+#     echo "" >> "$MANUSCRIPT_FILE"
+#     echo "" >> "$MANUSCRIPT_FILE"
+#     echo "![]($(basename "$BACK_COVER"))" >> "$MANUSCRIPT_FILE"
+#     echo "\thispagestyle{empty}" >> "$MANUSCRIPT_FILE"
+#     # Copy back cover to exports directory only if different
+#     if [ "$BACK_COVER" != "$EXPORTS_DIR/$(basename "$BACK_COVER")" ]; then
+#         cp "$BACK_COVER" "$EXPORTS_DIR/"
+#     fi
+# fi
 
 celebration "Manuscript Complete!"
 
@@ -1433,16 +1470,23 @@ body {
   text-align: justify;
   font-size: 12pt;
 }
+h1, h2, h3 {
+  text-align: center;
+  margin-left: auto;
+  margin-right: auto;
+}
+h1 {
+  font-size: 24pt;
+  margin-top: 15px;
+  margin-bottom: 10px;
+  font-weight: bold;
+}
 h1.chapter-title {
   text-align: center;
   font-size: 24pt;
-  margin-top: 60px;
-  margin-bottom: 60px;
+  margin-top: 30px;
+  margin-bottom: 15px;
   font-weight: bold;
-  page-break-before: always;
-}
-.toc-container {
-  page-break-after: always;
 }
 .toc-header {
   text-align: center;
@@ -1451,63 +1495,109 @@ h1.chapter-title {
   margin-bottom: 40px;
 }
 h2 { 
-  margin-top: 40px;
-  margin-bottom: 20px;
+  margin-top: 10px;
+  margin-bottom: 10px;
   font-size: 18pt;
+  text-align: center;
 }
 h3 { 
-  margin-top: 30px;
-  margin-bottom: 15px;
+  margin-top: 10px;
+  margin-bottom: 10px;
   font-size: 16pt;
+  text-align: center;
+}
+h4 {
+  margin-top: 10px;
+  margin-bottom: 10px;
+  font-size: 14pt;
+  text-align: center;
+}
+.chapter-main-title, .chapter-subtitle {
+  text-align: center;
+  display: block;
 }
 .title { font-size: 28pt; text-align: center; }
 .author { font-size: 16pt; text-align: center; }
 .date { font-size: 14pt; text-align: center; }
 .publisher { font-size: 14pt; text-align: center; }
 .rights { font-size: 14pt; text-align: center; }
-.logo { text-align: center; margin: 3em auto; page-break-after: always; }
+.logo { text-align: center; margin: 3em auto; }
 p {
   margin-bottom: 15px;
   orphans: 3;
   widows: 3;
 }
 .chapter {
-  display: block;
   height: 50px;
 }
 .titlepage {
   text-align: center;
   margin-top: 20%;
-  page-break-after: always;
 }
 .titlepage h1 {
   font-size: 2.5em;
   font-weight: bold;
   margin-bottom: 1em;
+  text-align: center;
 }
 .titlepage h2 {
   font-size: 1.8em;
   font-weight: bold;
-  margin-bottom: 3em;
+  margin-bottom: 1em;
+  text-align: center;
 }
 .titlepage p {
   font-size: 1.2em;
   margin: 0.5em 0;
+  text-align: center;
 }
 .copyright {
   text-align: center;
   margin: 10% auto;
   font-size: 0.9em;
   line-height: 1.5;
-  page-break-after: always;
-}
-h1:contains('Table of Contents') {
-  font-size: 2em;
-  text-align: center;
-  margin-top: 30%;
 }
 #TOC ol ol {
   list-style-type: none;
+}
+.pagebreak {
+  page-break-before: always; /* older readers */
+  break-before: page;        /* EPUB3 standard */
+}
+.fillspace {
+  height: 20vh; /* 20% of viewport height */
+}
+.copyright {
+  text-align: center;
+  font-family: serif;         /* matches LaTeX serif fonts */
+  font-size: 0.9em;
+  line-height: 1.5;
+  margin-top: 2em;
+}
+.copyright strong {
+  font-weight: bold;
+}
+span.copyright-notice {
+  display: block;
+  font-weight: bold;
+  font-size: 1.2em;
+  margin: 1em 0;
+  text-align: center;
+}
+.backcover {
+  width: 100vw;
+  height: 100vh;          /* fill screen height */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  page-break-before: always;  /* start on a new page */
+}
+.backcover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;        /* scale image to fill screen */
 }
 "
 
@@ -1557,59 +1647,16 @@ generate_ebook_format() {
             cover_basename=""
             [ -n "$cover" ] && cover_basename="$(basename "$cover")"
 
-                        # Split manuscript into a title/front-matter piece and body so we can insert a publisher page after the title
-                        title_md="$output_dir/_epub_title.md"
-                        body_md="$output_dir/_epub_body.md"
-                        back_md=""
+                        # # Prepare a temporary back-cover markdown file if a back cover image exists in the output dir
+                        # back_md=""
+                        # if [ -n "$BACK_COVER_IMAGE" ] && [ -f "$output_dir/$(basename "$BACK_COVER_IMAGE")" ]; then
+                        #         back_basename="$(basename "$BACK_COVER_IMAGE")"
+                        #         back_md="$output_dir/_backcover_insert.md"
+                        #         if [ ! -f "$back_md" ]; then
+                        #                 printf "\n\n![](%s)\n" "$back_basename" > "$back_md"
+                        #         fi
+                        # fi
 
-                        # If the manuscript contains a \tableofcontents marker, split at that line
-                        if grep -n -m1 '^\\tableofcontents' "$input_file" >/dev/null 2>&1; then
-                                toc_line=$(grep -n -m1 '^\\tableofcontents' "$input_file" | cut -d: -f1)
-                                # title part: lines 1..(toc_line-1)
-                                sed -n "1,$((toc_line-1))p" "$input_file" > "$title_md" || true
-                                # body part: from toc_line to end (include TOC)
-                                sed -n "${toc_line},\$p" "$input_file" > "$body_md" || true
-                        else
-                                # Fallback: leave title empty and use full manuscript as body
-                                : > "$title_md"
-                                cp "$input_file" "$body_md"
-                        fi
-
-                        # Create a publisher HTML page to appear after the title page in EPUB
-                        publisher_html="$output_dir/_epub_publisher.html"
-                        if [ ! -f "$publisher_html" ]; then
-                                cat > "$publisher_html" << HTML_EOF
-<!doctype html>
-<html lang="en">
-    <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width,initial-scale=1" />
-        <title>Publisher</title>
-        <style>
-            body { font-family: serif; text-align: center; margin: 2in 0; }
-            .publisher { font-size: 1.2em; margin-top: 1.5em; }
-            .logo { margin-top: 2.5em; }
-        </style>
-    </head>
-    <body>
-        <h1 class="title">${BOOK_TITLE:-}</h1>
-        <div class="publisher">${PUBLISHER:-}</div>
-        <div class="logo">
-        $(if [ -f "$EXPORTS_DIR/$LOGO_BASENAME" ]; then echo "<img src=\"$LOGO_BASENAME\" alt=\"Publisher logo\" style=\"max-width:40%;height:auto;\">"; fi)
-        </div>
-    </body>
-</html>
-HTML_EOF
-                        fi
-
-                        # Prepare a temporary back-cover markdown file if a back cover image exists in the output dir
-                        if [ -n "$BACK_COVER_IMAGE" ] && [ -f "$output_dir/$(basename "$BACK_COVER_IMAGE")" ]; then
-                                back_basename="$(basename "$BACK_COVER_IMAGE")"
-                                back_md="$output_dir/_backcover_insert.md"
-                                if [ ! -f "$back_md" ]; then
-                                        printf "\n\n![](%s)\n" "$back_basename" > "$back_md"
-                                fi
-                        fi
 
             # Run pandoc from the output directory so image paths resolve correctly. Use --toc and set chapter level
             (cd "$output_dir" && {
@@ -1620,14 +1667,16 @@ HTML_EOF
                             --css="$css_basename" \
                             --metadata-file="$metadata_basename" \
                             --toc --toc-depth=2 --resource-path=. \
-                            --split-level=2 -o "$(basename "$output_file")" "$input_basename" "$(basename "$back_md")"
+                            --epub-chapter-level=1 --epub-title-page=true \
+                            --split-level=1 -o "$(basename "$output_file")" "$input_basename" "$(basename "$back_md")"
                     else
                         pandoc -f markdown -t epub3 \
                             --epub-cover-image="$cover_basename" \
                             --css="$css_basename" \
                             --metadata-file="$metadata_basename" \
                             --toc --toc-depth=2 --resource-path=. \
-                            --split-level=2 -o "$(basename "$output_file")" "$input_basename"
+                            --epub-chapter-level=1 --epub-title-page=true \
+                            --split-level=1 -o "$(basename "$output_file")" "$input_basename"
                     fi
                 else
                     if [ -n "$back_md" ]; then
@@ -1635,21 +1684,18 @@ HTML_EOF
                             --css="$css_basename" \
                             --metadata-file="$metadata_basename" \
                             --toc --toc-depth=2 --resource-path=. \
-                            --split-level=2 -o "$(basename "$output_file")" "$input_basename" "$(basename "$back_md")"
+                            --epub-chapter-level=1 --epub-title-page=true \
+                            --split-level=1 -o "$(basename "$output_file")" "$input_basename" "$(basename "$back_md")"
                     else
                         pandoc -f markdown -t epub3 \
                             --css="$css_basename" \
                             --metadata-file="$metadata_basename" \
                             --toc --toc-depth=2 --resource-path=. \
-                            --split-level=2 -o "$(basename "$output_file")" "$input_basename"
+                            --epub-chapter-level=1 --epub-title-page=true \
+                            --split-level=1 -o "$(basename "$output_file")" "$input_basename"
                     fi
                 fi
             })
-
-            # Clean up temporary backcover md if we created one
-            if [ -n "$back_md" ] && [ -f "$back_md" ]; then
-                rm -f "$back_md" || true
-            fi
             
             echo "✅ EPUB created: $(basename "$output_file")"
             return 0
@@ -1658,20 +1704,21 @@ HTML_EOF
         pdf)
             output_file="${output_dir}/$(basename "$input_file" .md).pdf"
             echo "📄 Generating PDF format..."
-#             cover="$(basename "$COVER_IMAGE")"
-#             cat << EOF > "$EXPORTS_DIR/cover.tex"
-# \def\cover{$cover}
-# \usepackage{graphicx}
-# \usepackage{geometry}
+            cover="$COVER_IMAGE"
+            echo "$COVER_IMAGE"
+            cat << 'EOF' > "$EXPORTS_DIR/cover.tex"
+\def\cover{$cover}
+\usepackage{graphicx}
+\usepackage{geometry}
 
-# \AtBeginDocument{%
-#   \thispagestyle{empty}
-#   \newgeometry{margin=0mm}
-#   \includegraphics[width=\paperwidth,height=\paperheight,keepaspectratio=false]{$cover}
-#   \restoregeometry
-#   \newpage
-# }
-# EOF
+\AtBeginDocument{%
+  \thispagestyle{empty}
+  \newgeometry{margin=0mm}
+  \includegraphics[width=\paperwidth,height=\paperheight,keepaspectratio=false]{cover.png}
+  \restoregeometry
+  \newpage
+}
+EOF
 
             # Prepare latex helpers and optionally include back cover if present and is .jpg or .png
             if [ -n "$BACK_COVER_IMAGE" ] && [ -f "$BACK_COVER_IMAGE" ] && [[ "$BACK_COVER_IMAGE" == *.jpg || "$BACK_COVER_IMAGE" == *.png ]]; then
@@ -1700,13 +1747,13 @@ HTML_EOF
                 fi
             fi
 
-#             cat << EOF > "$EXPORTS_DIR/back-cover.tex"
-# \usepackage{pdfpages}
+            cat << EOF > "$EXPORTS_DIR/back-cover.tex"
+\usepackage{pdfpages}
 
-# \AtEndDocument{%
-#   \includepdf[pages=-,scale=1.2]{back-cover.pdf}
-# }
-# EOF
+\AtEndDocument{%
+  \includepdf[pages=-,scale=1.2]{$EXPORTS_DIR/back-cover.pdf}
+}
+EOF
 
                 # -H back-cover.tex \
 
@@ -1723,6 +1770,7 @@ HTML_EOF
 \titleformat{\subsubsection}{\fontsize{14}{18}\selectfont\bfseries}{\thesubsubsection}{1em}{}
 EOF
 
+            # -H cover.tex \
             # Try direct PDF generation first (run lualatex non-interactively to avoid hangs)
             (cd "$output_dir" && pandoc -f markdown -t pdf \
                 --pdf-engine=lualatex \
@@ -1730,6 +1778,7 @@ EOF
                 --pdf-engine-opt='-halt-on-error' \
                 --metadata-file="$(basename "$metadata")" \
                 -H titles.tex \
+                -H back-cover.tex \
                 -o "$(basename "$output_file")" "$(basename "$input_file")") && {
                 echo "✅ PDF created: $(basename "$output_file")"
                 return 0
@@ -1760,9 +1809,6 @@ EOF
         font-family: "Palatino", "Georgia", serif;
         font-size: 12pt;
         line-height: 1.5;
-    }
-    h1 {
-        page-break-before: always;
     }
     h1.chapter-title {
         margin-top: 3in;
