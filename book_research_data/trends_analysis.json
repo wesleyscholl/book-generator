@@ -1,0 +1,13 @@
+Error analyzing YouTube trends: HTTPSConnectionPool(host='www.youtube.com', port=443): Max retries exceeded with url: /results?search_query=relieving+headaches (Caused by SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate in certificate chain (_ssl.c:1032)')))
+{
+  "google_trends": {
+    "query": "relieving headaches",
+    "total_results": 0,
+    "related_questions": 0,
+    "recent_content_indicators": 0,
+    "related_searches": [],
+    "trend_score": 10,
+    "analysis_date": "2025-09-02T17:28:18.434507"
+  },
+  "youtube_trends": {}
+}

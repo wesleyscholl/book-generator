@@ -94,11 +94,11 @@ MODEL="gemini-1.5-flash-latest"
 TEMPERATURE=0.8
 TOP_K=40
 TOP_P=0.9
-MAX_TOKENS=8192
+MAX_TOKENS=16000
 MAX_RETRIES=1
-MIN_WORDS=2200
-MAX_WORDS=2500
-ACCEPTABLE_WORDS=1700
+MIN_WORDS=2500
+MAX_WORDS=3000
+ACCEPTABLE_WORDS=2000
 WRITING_STYLE="detailed"
 TONE="professional"
 DELAY_BETWEEN_CHAPTERS=60  # Seconds to avoid rate limits
@@ -1572,7 +1572,7 @@ if [ -z "$CHAPTERS_ONLY" ]; then
     # Add a topics & keywords section for book metadata and compilation 
 
     SYSTEM_PROMPT=$(cat << 'EOF'
-You are a professional book author and publishing consultant specializing in creating structured, commercially viable book outlines. Your outlines are used for generating 20,000-25,000 word books, so they must be comprehensive, precise, and follow the EXACT format without deviation.
+You are a professional book author and publishing consultant specializing in creating structured, commercially viable book outlines. Your outlines are used for generating 30,000-40,000 word books, so they must be comprehensive, precise, and follow the EXACT format without deviation.
 
 FORMATTING REQUIREMENTS (STRICT - DO NOT DEVIATE):
 1. You MUST follow the EXACT format provided in the user prompt
@@ -1581,10 +1581,10 @@ FORMATTING REQUIREMENTS (STRICT - DO NOT DEVIATE):
    ## The Book Subtitle
 3. Chapters MUST be formatted EXACTLY as follows (including the colon and spacing):
    ### Chapter 1: Chapter Title
-   Chapter summary text (2-3 sentences). No markdown or special characters.
+   Chapter summary text (6-10 bullet points). No markdown or special characters.
    
    ### Chapter 2: Chapter Title
-   Chapter summary text (2-3 sentences). No markdown or special characters.
+   Chapter summary text (6-10 bullet points). No markdown or special characters.
 4. Ensure you include EXACTLY 15 chapters
 5. Chapter titles must be specific, value-driven, and clearly indicate content
 6. NEVER include any placeholders like [Main Title] or [Subtitle] in your response
@@ -1612,7 +1612,53 @@ REQUIRED OUTPUT FORMAT (STRICT - DO NOT DEVIATE):
 ## [Write the subtitle here]
 
 SUMMARY:
-[Write a 2-3 sentence overview of the book]
+[Write a 4-6 sentence overview of the book]
+
+### Chapter 1: [Chapter title]
+[6-10 bullet point summary of the chapter content]
+
+### Chapter 2: [Chapter title]
+[6-10 bullet point summary of the chapter content]
+
+### Chapter 3: [Chapter title]
+[6-10 bullet point summary of the chapter content]
+
+### Chapter 4: [Chapter title]
+[6-10 bullet point summary of the chapter content]
+
+### Chapter 5: [Chapter title]
+[6-10 bullet point summary of the chapter content]
+
+### Chapter 6: [Chapter title]
+[6-10 bullet point summary of the chapter content]
+
+### Chapter 7: [Chapter title]
+[6-10 bullet point summary of the chapter content]
+
+### Chapter 8: [Chapter title]
+[6-10 bullet point summary of the chapter content]
+
+### Chapter 9: [Chapter title]
+[6-10 bullet point summary of the chapter content]
+
+### Chapter 10: [Chapter title]
+[6-10 bullet point summary of the chapter content]
+
+### Chapter 11: [Chapter title]
+[6-10 bullet point summary of the chapter content]
+
+### Chapter 12: [Chapter title]
+[6-10 bullet point summary of the chapter content]
+
+### Chapter 13: [Chapter title]
+[6-10 bullet point summary of the chapter content]
+
+### Chapter 14: [Chapter title]
+[6-10 bullet point summary of the chapter content]
+
+### Chapter 15: [Chapter title]
+[6-10 bullet point summary of the chapter content]
+[4-6 sentence summary of chapter content]
 
 THEMES:
 1. [Theme 1]
@@ -1621,51 +1667,6 @@ THEMES:
 
 TARGET READER:
 [Description of ideal readers and reading level]
-
-### Chapter 1: [Chapter title]
-[2-3 sentence summary of chapter content]
-
-### Chapter 2: [Chapter title]
-[2-3 sentence summary of chapter content]
-
-### Chapter 3: [Chapter title]
-[2-3 sentence summary of chapter content]
-
-### Chapter 4: [Chapter title]
-[2-3 sentence summary of chapter content]
-
-### Chapter 5: [Chapter title]
-[2-3 sentence summary of chapter content]
-
-### Chapter 6: [Chapter title]
-[2-3 sentence summary of chapter content]
-
-### Chapter 7: [Chapter title]
-[2-3 sentence summary of chapter content]
-
-### Chapter 8: [Chapter title]
-[2-3 sentence summary of chapter content]
-
-### Chapter 9: [Chapter title]
-[2-3 sentence summary of chapter content]
-
-### Chapter 10: [Chapter title]
-[2-3 sentence summary of chapter content]
-
-### Chapter 11: [Chapter title]
-[2-3 sentence summary of chapter content]
-
-### Chapter 12: [Chapter title]
-[2-3 sentence summary of chapter content]
-
-### Chapter 13: [Chapter title]
-[2-3 sentence summary of chapter content]
-
-### Chapter 14: [Chapter title]
-[2-3 sentence summary of chapter content]
-
-### Chapter 15: [Chapter title]
-[2-3 sentence summary of chapter content]
 
 KEY CONCEPTS:
 1. [Concept 1]: [Brief definition]
@@ -1921,7 +1922,7 @@ OUTLINE_CONTENT=$(cat "$OUTLINE_FILE")
 TOTAL_WORDS=0
 
 # System prompt for chapter generation
-CHAPTER_SYSTEM_PROMPT="You are a professional book author renowned for writing immersive, narrative-driven chapters. Your expertise lies in crafting flowing, long-form prose that is rich with vivid, descriptive language. You are a master of consistent pacing, emotional depth, and strong imagery. Your final output must always be publication-ready text, free of any meta notes, commentary, outlines, or annotations. Write each chapter to a minimum of 2200 words. Utilize markdown for all titles, subheadings, and formatting."
+CHAPTER_SYSTEM_PROMPT="You are a professional book author renowned for writing immersive, narrative-driven chapters. Your expertise lies in crafting flowing, long-form prose that is rich with vivid, descriptive language. You are a master of consistent pacing, emotional depth, and strong imagery. Your final output must always be publication-ready text, free of any meta notes, commentary, outlines, or annotations. Write each chapter to a minimum of $MIN_WORDS words. Utilize markdown for all titles, subheadings, and formatting."
 
 # Store chapters in an array to avoid pipe issues
 echo "DEBUG: Preparing to process chapters" >> debug.log
@@ -2074,6 +2075,9 @@ for CHAPTER_LINE in "${CHAPTER_LINES[@]}"; do
     # Clean outline content to remove markdown asterisks
 OUTLINE_CONTENT=$(echo "$OUTLINE_CONTENT" | sed 's/\*\*//g')
 
+# Get current chapter outline - Break at blank lines
+# CHAPTER_OUTLINE=$(echo "$OUTLINE_CONTENT" | sed -n "/^### Chapter $CHAPTER_NUM: $CHAPTER_TITLE\$/,/^### Chapter [0-9]\+: /{ /^### Chapter [0-9]\+: /q; p }")
+
 # Create new loop, to extend generate more to the chapter file and join both to meet the minimum word count
 
 CHAPTER_USER_PROMPT="Write Chapter ${CHAPTER_NUM}: '${CHAPTER_TITLE}'.
@@ -2087,26 +2091,28 @@ REQUIREMENTS:
 - **Expansion Focus:** For each example of play (e.g., arranging stones, building a fort, imaginary friends), dedicate significant space (at least 3-4 paragraphs) to fully expand on the cognitive, emotional, social, and physical benefits. Elaborate on the "why" and "how" of the learning process within these simple scenarios.
 - **Narrative Depth:** Weave in relatable anecdotes and scenarios that emotionally connect with the reader. Use vivid language and sensory details to bring the examples to life.
 - **Originality:** Ensure the text is original and avoid plagiarism.
+- **Expansion Opportunities:** Identify areas where additional detail or exploration could enhance the chapter. This might include deeper dives into specific examples, more extensive explanations of concepts, or the inclusion of supplementary anecdotes.
 - **Structure:**
     - **Strong Opening:** Begin with an engaging hook that challenges the reader's preconceived notions.
     - **Main Sections:** Dedicate distinct, well-developed sections for each key idea (the paradox of preparation, the neuroscience of play, the prepared environment).
     - **Transitions:** Ensure seamless transitions between sections and ideas.
     - **Reflective Conclusion:** End with a powerful, reflective summary that re-emphasizes the chapter's core message and smoothly leads into the next chapter on the science of play.
+    - **Bullet Points:** Turn each bullet point into fully developed paragraphs with explanations, examples, details, and smooth transitions, creating a coherent chapter from the outline.
 
 OUTPUT:
 - **Format:** Final, publication-ready prose only. No meta-notes, outlines, or 'Conclusion' labels.
 - **Content:** The output should be 90% or more long-form paragraphs. Limit the use of lists to one or fewer.
 - **Formatting:** Use markdown headings (##, ###) for chapter title and subheadings. Use **bold** for emphasis sparingly (limit to 5 phrases or fewer).
+- **Clarity:** Ensure that all explanations are clear and accessible, avoiding jargon where possible.
+- **Chapter Length:** Strive for $MIN_WORDS-$MAX_WORDS words. IMPORTANT: The chapter needs to be $MIN_WORDS words at a minimum.
 - **Final Output Only:** Return only the narrative content.
 - **Start with:**
 # Chapter ${CHAPTER_NUM}
-## ${CHAPTER_TITLE}
-
-- **Do not exceed $MAX_WORDS words.**"
+## ${CHAPTER_TITLE}"
 
     # STREAMLINED CHAPTER GENERATION WORKFLOW
     # Step 1: Generate initial chapter
-    echo "🤖 Step 1: Generating initial chapter content with Ollama..."
+    echo "🤖 Step 1: Generating initial chapter content with Gemini..."
     loading_dots 10 "🔄 Generating Chapter $CHAPTER_NUM" &
     MULTI_PROVIDER_RESULT=$(smart_api_call "$CHAPTER_USER_PROMPT" "$CHAPTER_SYSTEM_PROMPT" "creative" "$TEMPERATURE" "$MAX_TOKENS" "$MAX_RETRIES" "llama3.2:1b")
     API_STATUS=$?

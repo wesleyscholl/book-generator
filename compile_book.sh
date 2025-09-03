@@ -141,7 +141,6 @@ author: "$AUTHOR"
 rights: "Copyright © $PUBLICATION_YEAR $AUTHOR"
 language: "en-US"
 publisher: "$PUBLISHER"
-geometry: margin=1in
 identifier:
   - scheme: ISBN
     text: "${ISBN:-[No ISBN Provided]}"

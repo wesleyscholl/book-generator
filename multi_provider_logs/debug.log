@@ -2810,3 +2810,14 @@ DEBUG: call_ollama_api started with prompt length: 17275, system_prompt length: 
 DEBUG: Using model: , temperature: 0.95, max_tokens: 32000, ctx: 4096
 DEBUG: Using formatted prompt length: 17753
 DEBUG: About to make curl request to Ollama
+DEBUG: call_ollama_api started with prompt length: 9628, system_prompt length: 98
+DEBUG: Using model: , temperature: 0.7, max_tokens: 947, ctx: 4096
+DEBUG: Using formatted prompt length: 9758
+DEBUG: About to make curl request to Ollama
+DEBUG: curl completed with exit code: 0
+DEBUG: Response length: 39 characters
+DEBUG: Failed to extract .response from JSON, error: model 'llama3:8b' not found
+DEBUG: call_ollama_api started with prompt length: 9628, system_prompt length: 98
+DEBUG: Using model: , temperature: 0.7, max_tokens: 947, ctx: 4096
+DEBUG: Using formatted prompt length: 9758
+DEBUG: About to make curl request to Ollama

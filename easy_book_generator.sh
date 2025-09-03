@@ -474,7 +474,7 @@ generate_complete_book() {
     ./full_book_generator.sh "$TOPIC" "$GENRE" "$AUDIENCE" \
         --style "$STYLE" \
         --tone "$TONE" \
-        --delay 15
+        --delay 60
     
     if [ $? -eq 0 ]; then
         echo ""
@@ -537,8 +537,8 @@ generate_complete_book_from_suggestion() {
     ./full_book_generator.sh "$TOPIC" "$GENRE" "$AUDIENCE" \
         --style "$STYLE" \
         --tone "$TONE" \
-        --delay 15
-    
+        --delay 60
+
     if [ $? -eq 0 ]; then
         echo ""
         celebration "Book generation completed!"
@@ -1268,6 +1268,7 @@ suggest_topics() {
         
         SUGGESTION_PROMPT="Search the internet, research and collect 20 potential book topics, then randomly select 5 to provide detailed book suggestions based on the following criteria:
 - Topics and genres with demand and less saturation (e.g., from Kindle Direct Publishing trends).
+- Topics that have some competition but not so much that it becomes difficult to rank.
 - Topics that solve narrowly defined reader problems, pain points, or frustrations.
 - Current ($CURRENT_DATE) in-demand topics with a high probability of success and low risk of failure.
 - Topics with potential for creating additional books (series, bundles, etc.).
@@ -1296,9 +1297,9 @@ Important: Format your response as a numbered list 1-5, with each book having cl
                     }]
                 }],
                 "generationConfig": {
-                    "temperature": 1.0,
-                    "topK": 40,
-                    "topP": 0.95,
+                    "temperature": 1.3,
+                    "topK": 30,
+                    "topP": 1.0,
                     "maxOutputTokens": 1500
                 }
             }')

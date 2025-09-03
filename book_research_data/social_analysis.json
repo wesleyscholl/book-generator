@@ -1,0 +1,90 @@
+Reddit analysis error: HTTPSConnectionPool(host='www.reddit.com', port=443): Max retries exceeded with url: /search.json?q=relieving+headaches&type=sr (Caused by SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate in certificate chain (_ssl.c:1032)')))
+{
+  "query": "relieving headaches",
+  "instagram": {
+    "hashtag": "#relievingheadaches",
+    "research_url": "https://www.instagram.com/explore/tags/relievingheadaches/",
+    "analysis_method": "manual",
+    "research_notes": [
+      "Visit the hashtag page manually",
+      "Count recent posts (last 24 hours)",
+      "Check engagement rates on top posts",
+      "Look for business/brand usage vs personal",
+      "Note related hashtags suggested"
+    ]
+  },
+  "reddit": {
+    "error": "Could not analyze Reddit communities"
+  },
+  "pinterest": {
+    "search_url": "https://www.pinterest.com/search/pins/?q=relieving+headaches",
+    "research_method": "manual",
+    "analysis_steps": [
+      "Visit Pinterest search manually",
+      "Count pins in results",
+      "Check save rates on top pins",
+      "Look for seasonal trends",
+      "Note related search suggestions"
+    ],
+    "indicators": [
+      "High saves = strong interest",
+      "Many boards = topic authority potential",
+      "Recent pins = trending topic",
+      "Business pins = commercial opportunity"
+    ]
+  },
+  "research_checklist": {
+    "query": "relieving headaches",
+    "platforms": {
+      "tiktok": {
+        "hashtags_to_check": [
+          "#relievingheadaches",
+          "#relievingheadachestips",
+          "#relievingheadacheshack"
+        ],
+        "metrics_to_note": [
+          "Total hashtag views",
+          "Recent post count (last 7 days)",
+          "Average video engagement",
+          "Creator types (individual vs business)"
+        ]
+      },
+      "instagram": {
+        "research_areas": [
+          "#relievingheadaches hashtag page",
+          "Stories mentioning relieving headaches",
+          "Reels with relieving headaches audio/hashtags",
+          "Business accounts in niche"
+        ],
+        "engagement_indicators": [
+          "Comments per post",
+          "Save rates",
+          "Share frequency",
+          "Story interactions"
+        ]
+      },
+      "youtube": {
+        "search_terms": [
+          "relieving headaches tutorial",
+          "relieving headaches guide",
+          "how to relieving headaches",
+          "relieving headaches tips"
+        ],
+        "analysis_points": [
+          "Video count in results",
+          "View counts on top videos",
+          "Upload frequency",
+          "Channel subscriber counts"
+        ]
+      },
+      "pinterest": {
+        "board_analysis": [
+          "Boards about relieving headaches",
+          "Pin save rates",
+          "Seasonal trends",
+          "Related topics"
+        ]
+      }
+    }
+  }
+}

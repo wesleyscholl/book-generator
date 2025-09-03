@@ -6,8 +6,8 @@
 set -e
 
 # Configuration
-CONFIG_FILE="$HOME/.book_research_config"
-DATA_DIR="$HOME/.book_research_data"
+CONFIG_FILE="$HOME/book-generator/book_research_config"
+DATA_DIR="$HOME/book-generator/book_research_data"
 CACHE_DIR="$DATA_DIR/cache"
 RESULTS_FILE="$DATA_DIR/market_analysis.json"
 
@@ -119,7 +119,7 @@ class MarketResearcher:
             
             try:
                 time.sleep(self.rate_limit_delay)
-                response = self.session.get(url, timeout=15)
+                response = self.session.get(url, timeout=15, verify=False)
                 response.raise_for_status()
                 soup = BeautifulSoup(response.content, 'html.parser')
                 
@@ -476,9 +476,10 @@ class MarketResearcher:
     def assess_market_activity(self, total_reviews, book_count):
         avg_reviews = total_reviews / book_count if book_count else 0
         
-        if avg_reviews > 200:
+        # Lower thresholds to be more realistic for book markets
+        if avg_reviews > 50:  # Was 200
             return 'high'
-        elif avg_reviews > 50:
+        elif avg_reviews > 15:  # Was 50
             return 'medium'
         else:
             return 'low'
@@ -1241,7 +1242,7 @@ monitor_trends() {
     cat > "$DATA_DIR/trend_monitor.sh" << 'EOF'
 #!/bin/bash
 
-TRENDS_DIR="$HOME/.book_research_data/trend_monitoring"
+TRENDS_DIR="$HOME/book-generator/book_research_data/trend_monitoring"
 mkdir -p "$TRENDS_DIR"
 
 # Topics to monitor (add your own)
@@ -1253,10 +1254,10 @@ for topic in "${TOPICS[@]}"; do
     echo "Monitoring: $topic"
     
     # Analyze current trends
-    python3 "$HOME/.book_research_data/trends_analyzer.py" "$topic" > "$TRENDS_DIR/${topic// /_}_$(date +%Y%m%d).json"
+    python3 "$HOME/book-generator/book_research_data/trends_analyzer.py" "$topic" > "$TRENDS_DIR/${topic// /_}_$(date +%Y%m%d).json"
     
     # Quick market check
-    python3 "$HOME/.book_research_data/market_analyzer.py" search "$topic" 10 > /dev/null 2>&1
+    python3 "$HOME/book-generator/book_research_data/market_analyzer.py" search "$topic" 10 > /dev/null 2>&1
     
     if [[ -f "market_analysis.json" ]]; then
         mv "market_analysis.json" "$TRENDS_DIR/${topic// /_}_market_$(date +%Y%m%d).json"
@@ -1373,6 +1374,154 @@ with open('$export_dir/consolidated_analysis.csv', 'w', newline='') as csvfile:
     ls -la "$export_dir"
 }
 
+# Find opportunities without specifying a topic
+discover_opportunities() {
+    echo -e "${BLUE}🔍 Discovering Market Opportunities...${NC}"
+    echo -e "${YELLOW}This will take some time to analyze multiple potential topics...${NC}"
+    echo
+
+    # List of seed topics to analyze
+    SEED_TOPICS=(
+        "productivity habits" 
+        "mindfulness practice" 
+        "personal finance basics" 
+        "home organization" 
+        "healthy meal planning"
+        "digital minimalism" 
+        "stress management" 
+        "remote work skills" 
+        "self care routines"
+        "habit formation"
+        "time management"
+        "career development"
+        "leadership skills"
+        "effective communication"
+        "personal growth"
+    )
+    
+    echo -e "${CYAN}Step 1: Creating opportunity analysis file...${NC}"
+    > "$DATA_DIR/opportunity_analysis.csv"
+    echo "Topic,Opportunity Score,Competition Level,Market Activity,Monthly Searches,Recommendation,Notes" >> "$DATA_DIR/opportunity_analysis.csv"
+    
+    for topic in "${SEED_TOPICS[@]}"; do
+        echo -e "${CYAN}Analyzing: $topic${NC}"
+        
+        # Run market analysis
+        python3 "$DATA_DIR/market_analyzer.py" search "$topic" 15 > /dev/null 2>&1
+        
+        if [[ -f "market_analysis.json" ]]; then
+            # Get trend data
+            python3 "$DATA_DIR/trends_analyzer.py" "$topic" > "$DATA_DIR/trends_analysis.json" 2>/dev/null
+            
+            # Extract and save opportunity data
+            python3 -c "
+import json
+
+try:
+    # Load market analysis
+    with open('market_analysis.json') as f:
+        market = json.load(f)
+    
+    # Load trend data
+    trend_data = {}
+    try:
+        with open('$DATA_DIR/trends_analysis.json') as f:
+            trend_data = json.load(f)
+    except:
+        pass
+    
+    # Extract metrics
+    score = market.get('opportunity_score', 0)
+    comp = market.get('competition', {}).get('competition_level', 'unknown')
+    activity = market.get('demand', {}).get('market_activity_level', 'unknown')
+    searches = market.get('demand', {}).get('estimated_monthly_searches', 0)
+    
+    # Calculate trend score
+    trend_score = 0
+    if trend_data and 'google_trends' in trend_data:
+        trend_score = trend_data['google_trends'].get('trend_score', 0)
+    
+    # Generate recommendation
+    recommendation = 'neutral'
+    notes = []
+    
+    if score >= 60 and comp != 'high' and activity != 'low':
+        recommendation = 'excellent opportunity'
+        if comp == 'low':
+            notes.append('Low competition entry point')
+        else:
+            notes.append('Good demand-competition balance')
+    elif score >= 45 and comp != 'high':
+        recommendation = 'good opportunity'
+        notes.append('Moderate potential with targeted approach')
+    elif score < 30 or comp == 'high':
+        recommendation = 'avoid'
+        if comp == 'high':
+            notes.append('Too competitive')
+        else:
+            notes.append('Insufficient demand')
+    
+    if trend_score > 70:
+        notes.append('Strong upward trend')
+    
+    notes_str = '; '.join(notes)
+    
+    print(f'{market.get(\"query\", \"$topic\")},{score},{comp},{activity},{searches},{recommendation},{notes_str}')
+except Exception as e:
+    print(f'{topic},0,error,error,0,error,Analysis failed')
+" >> "$DATA_DIR/opportunity_analysis.csv"
+        else
+            echo "$topic,0,error,error,0,error,Analysis failed" >> "$DATA_DIR/opportunity_analysis.csv"
+        fi
+        
+        sleep 2  # Rate limiting
+    done
+    
+    echo -e "${GREEN}✅ Opportunity discovery complete!${NC}"
+    echo -e "${BLUE}Results saved to: $DATA_DIR/opportunity_analysis.csv${NC}"
+    
+    # Display top opportunities
+    echo
+    echo -e "${PURPLE}🏆 TOP DISCOVERED OPPORTUNITIES:${NC}"
+    python3 -c "
+import csv
+import sys
+
+opportunities = []
+with open('$DATA_DIR/opportunity_analysis.csv', 'r') as f:
+    reader = csv.DictReader(f)
+    for row in reader:
+        try:
+            score = int(row['Opportunity Score'])
+            comp = row['Competition Level']
+            activity = row['Market Activity']
+            rec = row['Recommendation']
+            notes = row['Notes']
+            
+            # Filter for balanced opportunities
+            is_balanced = score >= 45 and comp != 'high' and comp != 'error' and activity != 'low'
+            
+            if is_balanced:
+                opportunities.append((row['Topic'], score, comp, activity, rec, notes))
+        except:
+            continue
+
+opportunities.sort(key=lambda x: x[1], reverse=True)
+
+if opportunities:
+    print('\\nBest opportunities with good demand-competition balance:')
+    for i, (topic, score, comp, activity, rec, notes) in enumerate(opportunities[:5], 1):
+        emoji = '✅' if 'excellent' in rec.lower() else '⚡'
+        print(f'{i}. {emoji} {topic}: {score}/100')
+        print(f'   Competition: {comp.title()}, Market Activity: {activity.title()}')
+        if notes:
+            print(f'   Notes: {notes}')
+else:
+    print('\\nNo balanced opportunities found in the analyzed topics.')
+    print('Try analyzing more topics with the \"score\" command.')
+"
+}
+
 # Show comprehensive help
 show_help() {
     cat << EOF
@@ -1384,6 +1533,7 @@ USAGE: $0 <command> [options]
 CORE COMMANDS:
     init                           Initialize system and create tools
     search <query> [count]         Comprehensive market analysis (recommended)
+    discover                       Find promising opportunities automatically
     score                          Score multiple opportunities quickly  
     monitor                        Set up trend monitoring
     export                         Export all data for external analysis
@@ -1561,3 +1711,48 @@ main() {
                 echo -e "${RED}Please provide a search query${NC}"
                 exit 1
             fi
+            python3 "$DATA_DIR/social_analyzer.py" "$2"
+            ;;
+        "report")
+            create_research_suite
+            python3 "$DATA_DIR/report_generator.py" "market_analysis.json" "trends_analysis.json"
+            ;;
+        "score")
+            load_config
+            create_research_suite
+            score_opportunities
+            ;;
+        "discover")
+            load_config
+            create_research_suite
+            discover_opportunities
+            ;;
+        "monitor")
+            create_research_suite
+            monitor_trends
+            ;;
+        "export")
+            export_comprehensive
+            ;;
+        "config")
+            if [[ -f "$CONFIG_FILE" ]]; then
+                ${EDITOR:-nano} "$CONFIG_FILE"
+            else
+                init_config
+                ${EDITOR:-nano} "$CONFIG_FILE"
+            fi
+            ;;
+        "clean")
+            clean_cache
+            ;;
+        "status")
+            show_status
+            ;;
+        "help"|*)
+            show_help
+            ;;
+    esac
+}
+
+# Call main function
+main "$@"
