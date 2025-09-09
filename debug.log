@@ -571,3 +571,133 @@ DEBUG: Starting processing for chapter 10
 Debug: Including full content of last chapter 9 for context
 Debug: Getting style and tone instructions for chapter 10
 Debug: Getting style instructions for chapter 10
+Debug: Arguments passed:    --chapters-only ./book_outputs/the-micro-influence-advantage-20250903_095828//book_outline_reviewed.md
+Debug: OUTLINE_ONLY is set to: false
+Debug: OUTLINE_CONTENT in --chapters-only mode:
+# The Micro-Influence Advantage
+## Building Your Niche Brand and Monetizing Your Passion Online
+
+SUMMARY:
+This book is a comprehensive guide for aspiring creators looking to leverage the power of micro-influencing. It demystifies the process of building an authentic online brand within a specific niche and provides actionable strategies for monetizing your passion. From identifying your unique value proposition to engaging with your audience and securing brand partnerships, this book equips you with the knowledge and tools to thrive in the dynamic world of social media influence. Learn how to cultivate a loyal community and transform your online presence into a sustainable income stream.
+
+### Chapter 1: The Rise of the Micro-Influencer
+*   Defining what a micro-influencer is and why they are gaining prominence.
+*   Understanding the advantages of a smaller, engaged audience over a massive following.
+*   Exploring the shift in marketing trends and the increasing demand for authenticity.
+Debug: Starting final draft step with OUTLINE_CONTENT:
+# The Micro-Influence Advantage
+## Building Your Niche Brand and Monetizing Your Passion Online
+
+SUMMARY:
+This book is a comprehensive guide for aspiring creators looking to leverage the power of micro-influencing. It demystifies the process of building an authentic online brand within a specific niche and provides actionable strategies for monetizing your passion. From identifying your unique value proposition to engaging with your audience and securing brand partnerships, this book equips you with the knowledge and tools to thrive in the dynamic world of social media influence. Learn how to cultivate a loyal community and transform your online presence into a sustainable income stream.
+
+### Chapter 1: The Rise of the Micro-Influencer
+*   Defining what a micro-influencer is and why they are gaining prominence.
+*   Understanding the advantages of a smaller, engaged audience over a massive following.
+*   Exploring the shift in marketing trends and the increasing demand for authenticity.
+DEBUG: Preparing to process chapters
+DEBUG: Found 15 chapters to process
+DEBUG: Starting processing for chapter 1
+ℹ️ Resuming from chapter: 10
+⏭️ Skipping Chapter 1 (already exists)
+DEBUG: Starting processing for chapter 2
+⏭️ Skipping Chapter 2 (already exists)
+DEBUG: Starting processing for chapter 3
+⏭️ Skipping Chapter 3 (already exists)
+DEBUG: Starting processing for chapter 4
+⏭️ Skipping Chapter 4 (already exists)
+DEBUG: Starting processing for chapter 5
+⏭️ Skipping Chapter 5 (already exists)
+DEBUG: Starting processing for chapter 6
+⏭️ Skipping Chapter 6 (already exists)
+DEBUG: Starting processing for chapter 7
+⏭️ Skipping Chapter 7 (already exists)
+DEBUG: Starting processing for chapter 8
+⏭️ Skipping Chapter 8 (already exists)
+DEBUG: Starting processing for chapter 9
+⏭️ Skipping Chapter 9 (already exists)
+DEBUG: Starting processing for chapter 10
+Debug: Including full content of last chapter 9 for context
+Debug: Getting style and tone instructions for chapter 10
+Debug: Getting style instructions for chapter 10
+DEBUG: Error at line 1956: Command "multi_check_plagiarism "$CHAPTER_FILE" > /dev/null 2>&1" exited with status 127
+DEBUG: Starting processing for chapter 11
+Debug: Including full content of last chapter 10 for context
+Debug: Getting style and tone instructions for chapter 11
+Debug: Getting style instructions for chapter 11
+DEBUG: Error at line 1956: Command "multi_check_plagiarism "$CHAPTER_FILE" > /dev/null 2>&1" exited with status 127
+DEBUG: Starting processing for chapter 12
+Debug: Including full content of last chapter 11 for context
+Debug: Getting style and tone instructions for chapter 12
+Debug: Getting style instructions for chapter 12
+DEBUG: Error at line 1956: Command "multi_check_plagiarism "$CHAPTER_FILE" > /dev/null 2>&1" exited with status 127
+DEBUG: Starting processing for chapter 13
+Debug: Including full content of last chapter 12 for context
+Debug: Getting style and tone instructions for chapter 13
+Debug: Getting style instructions for chapter 13
+Debug: Arguments passed:    --chapters-only ./book_outputs/the-micro-influence-advantage-20250903_095828//book_outline_reviewed.md
+Debug: OUTLINE_ONLY is set to: false
+Debug: OUTLINE_CONTENT in --chapters-only mode:
+# The Micro-Influence Advantage
+## Building Your Niche Brand and Monetizing Your Passion Online
+
+SUMMARY:
+This book is a comprehensive guide for aspiring creators looking to leverage the power of micro-influencing. It demystifies the process of building an authentic online brand within a specific niche and provides actionable strategies for monetizing your passion. From identifying your unique value proposition to engaging with your audience and securing brand partnerships, this book equips you with the knowledge and tools to thrive in the dynamic world of social media influence. Learn how to cultivate a loyal community and transform your online presence into a sustainable income stream.
+
+### Chapter 1: The Rise of the Micro-Influencer
+*   Defining what a micro-influencer is and why they are gaining prominence.
+*   Understanding the advantages of a smaller, engaged audience over a massive following.
+*   Exploring the shift in marketing trends and the increasing demand for authenticity.
+Debug: Starting final draft step with OUTLINE_CONTENT:
+# The Micro-Influence Advantage
+## Building Your Niche Brand and Monetizing Your Passion Online
+
+SUMMARY:
+This book is a comprehensive guide for aspiring creators looking to leverage the power of micro-influencing. It demystifies the process of building an authentic online brand within a specific niche and provides actionable strategies for monetizing your passion. From identifying your unique value proposition to engaging with your audience and securing brand partnerships, this book equips you with the knowledge and tools to thrive in the dynamic world of social media influence. Learn how to cultivate a loyal community and transform your online presence into a sustainable income stream.
+
+### Chapter 1: The Rise of the Micro-Influencer
+*   Defining what a micro-influencer is and why they are gaining prominence.
+*   Understanding the advantages of a smaller, engaged audience over a massive following.
+*   Exploring the shift in marketing trends and the increasing demand for authenticity.
+DEBUG: Preparing to process chapters
+DEBUG: Found 15 chapters to process
+DEBUG: Starting processing for chapter 1
+ℹ️ Resuming from chapter: 13
+⏭️ Skipping Chapter 1 (already exists)
+DEBUG: Starting processing for chapter 2
+⏭️ Skipping Chapter 2 (already exists)
+DEBUG: Starting processing for chapter 3
+⏭️ Skipping Chapter 3 (already exists)
+DEBUG: Starting processing for chapter 4
+⏭️ Skipping Chapter 4 (already exists)
+DEBUG: Starting processing for chapter 5
+⏭️ Skipping Chapter 5 (already exists)
+DEBUG: Starting processing for chapter 6
+⏭️ Skipping Chapter 6 (already exists)
+DEBUG: Starting processing for chapter 7
+⏭️ Skipping Chapter 7 (already exists)
+DEBUG: Starting processing for chapter 8
+⏭️ Skipping Chapter 8 (already exists)
+DEBUG: Starting processing for chapter 9
+⏭️ Skipping Chapter 9 (already exists)
+DEBUG: Starting processing for chapter 10
+⏭️ Skipping Chapter 10 (already exists)
+DEBUG: Starting processing for chapter 11
+⏭️ Skipping Chapter 11 (already exists)
+DEBUG: Starting processing for chapter 12
+⏭️ Skipping Chapter 12 (already exists)
+DEBUG: Starting processing for chapter 13
+Debug: Including full content of last chapter 12 for context
+Debug: Getting style and tone instructions for chapter 13
+Debug: Getting style instructions for chapter 13
+DEBUG: Error at line 1956: Command "multi_check_plagiarism "$CHAPTER_FILE" > /dev/null 2>&1" exited with status 127
+DEBUG: Starting processing for chapter 14
+Debug: Including full content of last chapter 13 for context
+Debug: Getting style and tone instructions for chapter 14
+Debug: Getting style instructions for chapter 14
+DEBUG: Error at line 1956: Command "multi_check_plagiarism "$CHAPTER_FILE" > /dev/null 2>&1" exited with status 127
+DEBUG: Starting processing for chapter 15
+Debug: Including full content of last chapter 14 for context
+Debug: Getting style and tone instructions for chapter 15
+Debug: Getting style instructions for chapter 15
+DEBUG: Error at line 1956: Command "multi_check_plagiarism "$CHAPTER_FILE" > /dev/null 2>&1" exited with status 127

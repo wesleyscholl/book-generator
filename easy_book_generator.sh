@@ -255,12 +255,13 @@ Choose your workflow:
 4) 📖 Compile Existing Chapters into Manuscript
 5) ✨ Review & Edit Existing Book
 6) 🧾 Generate References for a Book
-7) ⚙️  Configure Settings
-8) ❓ Help & Examples
-9) 🚪 Exit
+7) 📑 Generate Appendices & Extras for a Book
+8) ⚙️  Configure Settings
+9) ❓ Help & Examples
+10) 🚪 Exit
 
 EOF
-    echo -n "Select option (1-9): "
+    echo -n "Select option (1-10): "
 }
 
 configure_settings() {
@@ -782,11 +783,16 @@ generate_chapters_from_outline() {
     if [ $? -eq 0 ]; then
         echo ""
         celebration "All chapters generated!"
-        
-        read -p "✨ Run AI review and editing? (Y/n): " run_editing
-        if [[ ! $run_editing =~ ^[Nn]$ ]]; then
+
+        read -p "🧾 Generate references for this book? (Y/n): " generate_refs
+        if [[ ! $generate_refs =~ ^[Nn]$ ]]; then
             BOOK_DIR=$(dirname "$SELECTED_OUTLINE")
-            review_and_edit_book "$BOOK_DIR"
+            if [ -f "./generate_references.sh" ]; then
+                echo "🔍 Generating references..."
+                ./generate_references.sh "$BOOK_DIR"
+            else
+                echo "❌ generate_references.sh not found. Please use option 6 from the main menu to generate references."
+            fi
         fi
         
         read -p "📖 Compile into final manuscript? (Y/n): " compile_now
@@ -794,6 +800,12 @@ generate_chapters_from_outline() {
             BOOK_DIR=$(dirname "$SELECTED_OUTLINE")
             ./compile_book.sh "$BOOK_DIR"
         fi
+
+        read -p "✨ Run AI review and editing? (Y/n): " run_editing
+        if [[ ! $run_editing =~ ^[Nn]$ ]]; then
+            BOOK_DIR=$(dirname "$SELECTED_OUTLINE")
+            review_and_edit_book "$BOOK_DIR"
+        fi 
     fi
 }
 
@@ -854,11 +866,98 @@ generate_references_menu() {
     chmod +x ./generate_references.sh
     
     # Run reference generation
-    echo "� Running reference generation script..."
+    echo "🔄 Running reference generation script..."
     if ./generate_references.sh "$selected_dir" "$batch_size"; then
         echo "✅ References generation complete"
     else
         echo "❌ References generation failed"
+    fi
+    
+    echo
+    echo "Press Enter to return to the main menu"
+    read -r
+}
+
+generate_appendices_menu() {
+    echo "📑 Generate Appendices & Extras for a Book"
+    echo
+    
+    if ! get_book_dirs 1; then
+        echo
+        echo "❌ No books with chapters found to generate appendices for"
+        echo
+        echo "Press Enter to return to the main menu"
+        read -r
+        return
+    fi
+    
+    echo
+    echo "Select a book to generate appendices & extras for (or 0 to cancel):"
+    read -r selection
+    
+    if [[ ! "$selection" =~ ^[0-9]+$ ]] || [ "$selection" -lt 1 ] || [ "$selection" -gt "${#book_dirs[@]}" ]; then
+        if [ "$selection" = "0" ]; then
+            echo "Operation canceled."
+            return
+        fi
+        echo "❌ Invalid selection"
+        echo
+        echo "Press Enter to return to the main menu"
+        read -r
+        return
+    fi
+    
+    selected_dir="${book_dirs[$((selection-1))]}"
+    book_name=$(basename "$selected_dir")
+    
+    echo
+    echo "📑 Generating appendices & extras for $book_name..."
+    
+    # Check if generate_appendices.sh exists
+    if [ ! -f "./generate_appendices.sh" ]; then
+        echo "❌ generate_appendices.sh not found in current directory"
+        echo
+        echo "Press Enter to return to the main menu"
+        read -r
+        return 1
+    fi
+    
+    chmod +x ./generate_appendices.sh
+    
+    # Show which files will be generated
+    echo "The following files will be generated:"
+    echo "  - epilogue.md"
+    echo "  - glossary.md"
+    echo "  - discussion.md"
+    echo "  - appendices.md"
+    echo "  - preface.md"
+    echo "  - introduction.md"
+    echo "  - dedication.md"
+    echo "  - acknowledgments.md"
+    echo "  - prologue.md"
+    echo "  - endnotes.md"
+    echo "  - further_reading.md"
+    echo "  - reader_thanks.md"
+
+    read -p "Continue with generation? (Y/n): " confirm
+    if [[ "$confirm" =~ ^[Nn]$ ]]; then
+        echo "Operation canceled."
+        return
+    fi
+    
+    # Run appendices generation
+    echo "🔄 Running appendices & extras generation script..."
+    if ./generate_appendices.sh "$selected_dir"; then
+        echo "✅ Appendices & extras generation complete"
+        
+        # Ask if they want to compile with the new appendices
+        echo
+        read -p "Compile book with the new appendices now? (Y/n): " compile_now
+        if [[ ! "$compile_now" =~ ^[Nn]$ ]]; then
+            ./compile_book.sh "$selected_dir"
+        fi
+    else
+        echo "❌ Appendices & extras generation failed"
     fi
     
     echo
@@ -1480,14 +1579,18 @@ main() {
                 read -p "Press Enter to continue..."
                 ;;
             7)
-                configure_settings
+                generate_appendices_menu
                 read -p "Press Enter to continue..."
                 ;;
             8)
-                show_help
+                configure_settings
                 read -p "Press Enter to continue..."
                 ;;
             9)
+                show_help
+                read -p "Press Enter to continue..."
+                ;;
+            10)
                 # Calculate and display elapsed time before exiting
                 END_TIME=$(date +%s)
                 ELAPSED_TIME=$((END_TIME - START_TIME))
@@ -1501,7 +1604,7 @@ main() {
                 exit 0
                 ;;
             *)
-                echo "❌ Invalid option. Please choose 1-9."
+                echo "❌ Invalid option. Please choose 1-10."
                 sleep 2
                 ;;
         esac

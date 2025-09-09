@@ -141,6 +141,8 @@ author: "$AUTHOR"
 rights: "Copyright © $PUBLICATION_YEAR $AUTHOR"
 language: "en-US"
 publisher: "$PUBLISHER"
+papersize: 6in,9in
+geometry: "top=2in, bottom=2in, inner=2in, outer=2in"
 identifier:
   - scheme: ISBN
     text: "${ISBN:-[No ISBN Provided]}"
@@ -165,7 +167,7 @@ generate_author_pen_name() {
     
     # Use a predefined list of creative pen names
     local pen_names=(
-        "Elara Morgan"
+        # "Elara Morgan"
         # "J.T. Blackwood"
         # "Sophia Wyndham"
         # "Xavier Stone"
@@ -173,7 +175,7 @@ generate_author_pen_name() {
         # "Isabella Quinn"
         # "Nathaniel Grey"
         # "Olivia Sterling"
-        # "Liam West"
+        "Liam West"
         # "Mia Rivers"
         # "Noah Bennett"
         # "Ava Sinclair"
@@ -858,11 +860,40 @@ if [ -f "$AUTHOR_PHOTO_SRC" ]; then
 fi
 AUTHOR_PHOTO_BASENAME="$(basename "$AUTHOR_PHOTO_SRC")"
 
+# Copy icon photo into exports dir for inclusion in manuscript
 ICON_PHOTO_SRC="$SCRIPT_DIR/icon.png"
 if [ -f "$ICON_PHOTO_SRC" ]; then
     cp -f "$ICON_PHOTO_SRC" "$EXPORTS_DIR/$(basename "$ICON_PHOTO_SRC")" 2>/dev/null || true
 fi
 ICON_BASENAME="$(basename "$ICON_PHOTO_SRC")"
+
+# Copy the QR code image into exports dir for inclusion in manuscript
+QR_CODE_SRC="$SCRIPT_DIR/qr-code.png"
+if [ -f "$QR_CODE_SRC" ]; then
+    cp -f "$QR_CODE_SRC" "$EXPORTS_DIR/$(basename "$QR_CODE_SRC")" 2>/dev/null || true
+fi
+QR_CODE="$(basename "$QR_CODE_SRC")"
+
+# Copy the back cover pdf into exports dir for inclusion in manuscript
+BACK_COVER_PDF_SRC="$SCRIPT_DIR/back-cover.png"
+if [ -f "$BACK_COVER_PDF_SRC" ]; then
+    cp -f "$BACK_COVER_PDF_SRC" "$EXPORTS_DIR/$(basename "$BACK_COVER_PDF_SRC")" 2>/dev/null || true
+fi
+BACK_COVER_PDF_BASENAME="$(basename "$BACK_COVER_PDF_SRC")"
+
+# Copy back cover 1 image into exports dir for inclusion in manuscript
+BACK_COVER1_SRC="$SCRIPT_DIR/back-cover-1.png"
+if [ -f "$BACK_COVER1_SRC" ]; then
+    cp -f "$BACK_COVER1_SRC" "$EXPORTS_DIR/$(basename "$BACK_COVER1_SRC")" 2>/dev/null || true
+fi
+BACK_COVER1_BASENAME="$(basename "$BACK_COVER1_SRC")"
+
+# Copy cover 1 image into exports dir for inclusion in manuscript
+COVER1_SRC="$SCRIPT_DIR/cover-1.png"
+if [ -f "$COVER1_SRC" ]; then
+    cp -f "$COVER1_SRC" "$EXPORTS_DIR/$(basename "$COVER1_SRC")" 2>/dev/null || true
+fi
+COVER1_BASENAME="$(basename "$COVER1_SRC")"
 
 echo "📑 Creating manuscript: $(basename "$MANUSCRIPT_FILE")"
 
@@ -976,8 +1007,11 @@ SUB_TITLE=$(head -n 2 "$OUTLINE_FILE" | tail -n 1 | sed 's/^## //; s/^SUBTITLE:[
 #   - \titleformat{\subsection}[block]{\bfseries\Large\centering}{}{0pt}{}
 # ---
 
-cat << EOF > "$MANUSCRIPT_FILE"
+## $SUB_TITLE 
+### By $AUTHOR
+#### Copyright © $PUBLICATION_YEAR
 
+cat << EOF > "$MANUSCRIPT_FILE"
 
 \renewcommand{\contentsname}{\Huge Table of Contents}
 \thispagestyle{empty}
@@ -985,13 +1019,30 @@ cat << EOF > "$MANUSCRIPT_FILE"
 \thispagestyle{empty}
 \clearpage\vspace*{\fill}
 
+::: {.centered}
+\centering
+
 $(if [ -f "$EXPORTS_DIR/$ICON_BASENAME" ]; then echo "![]($ICON_BASENAME){ width=40% } "; fi)
 
-\begin{center}
-{\fontsize{28}{32}\selectfont\bfseries }
-\end{center}
+\raggedright
+\flushleft
+:::
+\vspace{3em}
 
-\vspace{4em}
+\begin{center}
+{\fontsize{32}{36}\selectfont\bfseries $BOOK_TITLE}
+\end{center}
+\vspace{3em}
+\begin{center}
+{\fontsize{24}{28}\selectfont\bfseries $SUB_TITLE}
+\end{center}
+\vspace{2em}
+\begin{center}
+{\fontsize{18}{20}\selectfont\bfseries By $AUTHOR}
+\end{center}
+\begin{center}
+{\fontsize{14}{16}\selectfont\bfseries Copyright © $PUBLICATION_YEAR}
+\end{center}
 
 ## $SUB_TITLE
 ### By $AUTHOR
@@ -1012,14 +1063,14 @@ $(if [ -f "$EXPORTS_DIR/playfulpath.png" ]; then echo "![](playfulpath.png){ wid
 ::: {.fillspace}
 :::
 ::: {.copyright}
+
 \clearpage\vspace*{\fill}
 \centering
 $(if [ -f "$EXPORTS_DIR/$LOGO_BASENAME" ]; then echo "![]($LOGO_BASENAME){ width=25% } "; fi)
 
 $(if [ -n "$ISBN" ]; then echo "ISBN: $ISBN"; fi)
 
-<!-- Copyright section without heading -->
-<span class="copyright-notice">Copyright Notice</span>
+**Copyright Notice**
 
 All rights reserved. No part of this publication may be reproduced, distributed, or transmitted in any form or by any means, including photocopying, recording, or other electronic or mechanical methods, without the prior written permission of the publisher.
 
@@ -1037,6 +1088,18 @@ All rights reserved. No part of this publication may be reproduced, distributed,
 
 \setcounter{tocdepth}{2}
 \tableofcontents
+\newpage
+
+\clearpage
+
+::: {.pagebreak}
+:::
+
+::: {.newpage}
+:::
+
+::: {.fillspace}
+:::
 
 EOF
 
@@ -1101,15 +1164,17 @@ for CHAPTER_FILE in "${CHAPTER_FILES[@]}"; do
         CHAPTER_SUBTITLE=$(echo "$CLEAN_CHAPTER_TITLE" | cut -d: -f2- | sed 's/^ *//; s/ *$//')
 
         # Use a single heading section for all title information
-        echo "# Chapter $CHAPTER_NUM: $CHAPTER_MAIN_TITLE {.chapter-title}" >> "$MANUSCRIPT_FILE"
+        echo "# Chapter $CHAPTER_NUM {.chapter-title}" >> "$MANUSCRIPT_FILE"
+        echo "## $CHAPTER_MAIN_TITLE {.chapter-main-title}" >> "$MANUSCRIPT_FILE"
         echo "" >> "$MANUSCRIPT_FILE"
         # H3: subtitle (optional)
         if [ -n "$CHAPTER_SUBTITLE" ]; then
             echo "### $CHAPTER_SUBTITLE {.chapter-subtitle}" >> "$MANUSCRIPT_FILE"
         fi
     else
-        # No colon found: Single H1 with full title
-        echo "# Chapter $CHAPTER_NUM: $CLEAN_CHAPTER_TITLE {.chapter-title}" >> "$MANUSCRIPT_FILE"
+        # No colon found: Use CLEAN_CHAPTER_TITLE as the main title
+        echo "# Chapter $CHAPTER_NUM {.chapter-title}" >> "$MANUSCRIPT_FILE"
+        echo "## $CLEAN_CHAPTER_TITLE {.chapter-main-title}" >> "$MANUSCRIPT_FILE"
     fi
     echo "" >> "$MANUSCRIPT_FILE"
 
@@ -1199,12 +1264,11 @@ for CHAPTER_FILE in "${CHAPTER_FILES[@]}"; do
     echo "✅ Chapter $CHAPTER_NUM added ($CHAPTER_WORDS words)"
 done
 
-echo ""
-
 # Function: insert extra sections (epilogue, glossary, discussion, appendices)
+# "thank-you-readers.md"
 insert_extra_sections() {
     local base_dir="$BOOK_DIR"
-    local files=("epilogue.md" "glossary.md" "discussion.md" "appendices.md")
+    local files=("epilogue.md" "glossary.md" "discussion.md" "appendices.md" "further-reading.md" "endnotes.md")
     for f in "${files[@]}"; do
         path="$base_dir/$f"
         if [ -f "$path" ]; then
@@ -1214,7 +1278,9 @@ insert_extra_sections() {
             echo "\pagebreak" >> "$MANUSCRIPT_FILE"
             echo "\newpage" >> "$MANUSCRIPT_FILE"
             echo "" >> "$MANUSCRIPT_FILE"
-            echo "# $TITLE" >> "$MANUSCRIPT_FILE"
+            if [ $path != "$base_dir/thank-you-readers.md" ]; then
+                echo "# $TITLE" >> "$MANUSCRIPT_FILE"
+            fi
             echo "" >> "$MANUSCRIPT_FILE"
             # Remove title from the path file
             tail -n +2 "$path" >> "$MANUSCRIPT_FILE"
@@ -1351,12 +1417,16 @@ cat << EOF >> "$MANUSCRIPT_FILE"
 \begin{center}
 \section{References}
 \end{center}
+
 ::: {.pagebreak}
 :::
 ::: {.newpage}
 :::
+
 # References
+
 EOF
+
 
 cat "$BIB_FILE" >> "$MANUSCRIPT_FILE"
 
@@ -1370,13 +1440,15 @@ cat << EOF >> "$MANUSCRIPT_FILE"
 EOF
 
 cat << EOF >> "$MANUSCRIPT_FILE"
-\pagebreak
 ::: {.pagebreak}
 :::
 ::: {.newpage}
 :::
-## Author Bio {.unlisted .unnumbered}
 
+\pagebreak
+\newpage
+
+## About the Author
 EOF
 
 # Insert image using raw LaTeX if it exists
@@ -1389,23 +1461,30 @@ $(if [ -f "$EXPORTS_DIR/$AUTHOR_PHOTO_BASENAME" ]; then echo "![]($AUTHOR_PHOTO_
 EOF
 fi
 # \includegraphics[width=0.5\\textwidth]{$AUTHOR_PHOTO_BASENAME}
+# Elara Morgan is a passionate non-fiction author who explores the intricacies of human experience and the world around us. With a gift for making complex topics accessible, she bridges the gap between academic research and everyday life, empowering readers with knowledge that is both insightful and practical. Drawing on her background in education and the humanities, she distills ideas into engaging narratives that resonate widely. Her books are praised for their clarity, warmth, and thoughtful challenges to conventional wisdom. Beyond writing, Elara finds inspiration in nature—hiking New Hampshire's trails, tending her garden, and cherishing family time in Portsmouth. These pursuits ground her while fueling her creativity, making her life and work a testament to curiosity and the joy of discovery.
 
 cat << EOF >> "$MANUSCRIPT_FILE"
 \vspace{1cm}
 
+Liam West is a digital strategist, entrepreneur, and creator who has helped countless individuals and brands harness the power of micro-influence to grow their presence and monetize their passions. With years of experience navigating the ever-evolving landscape of social media and online business, Liam specializes in breaking down complex strategies into simple, actionable steps that anyone can follow.
 
-Elara Morgan is a passionate non-fiction author who explores the intricacies of human experience and the world around us. With a gift for making complex topics accessible, she bridges the gap between academic research and everyday life, empowering readers with knowledge that is both insightful and practical. Drawing on her background in education and the humanities, she distills ideas into engaging narratives that resonate widely. Her books are praised for their clarity, warmth, and thoughtful challenges to conventional wisdom. Beyond writing, Elara finds inspiration in nature—hiking New Hampshire's trails, tending her garden, and cherishing family time in Portsmouth. These pursuits ground her while fueling her creativity, making her life and work a testament to curiosity and the joy of discovery.
+Through his work, Liam has guided aspiring creators, small business owners, and niche influencers to build authentic brands, cultivate engaged communities, and create sustainable income streams online. His mission is to empower everyday people to realize that influence isn't about millions of followers—it's about making a meaningful impact within your niche.
+
+When he's not writing, speaking, or coaching, Liam enjoys exploring new cities, sipping fine coffee, and finding inspiration in the stories of creators worldwide.
 
 \vspace{2cm}
 
 ::: {.pagebreak}
 :::
+
 \pagebreak
 
 \clearpage\vspace*{\fill}
+
 ::: {.fillspace}
 :::
 ::: {.copyright}
+
 \centering
 $(if [ -f "$EXPORTS_DIR/$LOGO_BASENAME" ]; then echo "![]($LOGO_BASENAME){ width=25% } "; fi)
 \raggedright
@@ -1427,6 +1506,8 @@ All intellectual property rights, including copyrights, in this book are owned b
 
 ::: {.pagebreak}
 :::
+
+![](back-cover-1.png)
 
 ![](back-cover.png)
 EOF
@@ -1583,20 +1664,8 @@ span.copyright-notice {
   margin: 1em 0;
   text-align: center;
 }
-.backcover {
-  width: 100vw;
-  height: 100vh;          /* fill screen height */
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
+.centered {
   text-align: center;
-  page-break-before: always;  /* start on a new page */
-}
-.backcover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;        /* scale image to fill screen */
 }
 "
 
@@ -1662,7 +1731,7 @@ generate_ebook_format() {
                 if [ -n "$cover_basename" ]; then
                     if [ -n "$back_md" ]; then
                         pandoc -f markdown -t epub3 \
-                            --epub-cover-image="$cover_basename" \
+                            --epub-cover-image="$COVER1_BASENAME" \
                             --css="$css_basename" \
                             --metadata-file="$metadata_basename" \
                             --toc --toc-depth=2 --resource-path=. \
@@ -1670,7 +1739,7 @@ generate_ebook_format() {
                             --split-level=1 -o "$(basename "$output_file")" "$input_basename" "$(basename "$back_md")"
                     else
                         pandoc -f markdown -t epub3 \
-                            --epub-cover-image="$cover_basename" \
+                            --epub-cover-image="$COVER1_BASENAME" \
                             --css="$css_basename" \
                             --metadata-file="$metadata_basename" \
                             --toc --toc-depth=2 --resource-path=. \
@@ -1705,19 +1774,31 @@ generate_ebook_format() {
             echo "📄 Generating PDF format..."
             cover="$COVER_IMAGE"
             echo "$COVER_IMAGE"
-            cat << 'EOF' > "$EXPORTS_DIR/cover.tex"
-\def\cover{$cover}
-\usepackage{graphicx}
-\usepackage{geometry}
+#             cat << 'EOF' > "$EXPORTS_DIR/cover.tex"
+# \def\cover{$cover}
+# \usepackage{graphicx}
+# \usepackage{geometry}
 
-\AtBeginDocument{%
-  \thispagestyle{empty}
-  \newgeometry{margin=0mm}
-  \includegraphics[width=\paperwidth,height=\paperheight,keepaspectratio=false]{cover.png}
-  \restoregeometry
-  \newpage
-}
-EOF
+# \AtBeginDocument{%
+#   \thispagestyle{empty}
+#   \newgeometry{margin=0mm}
+#   \includegraphics[width=\paperwidth,height=\paperheight,keepaspectratio=false]{cover.png}
+#   \thispagestyle{empty}
+#   \includegraphics[width=\paperwidth,height=\paperheight,keepaspectratio=false]{cover-1.png}
+#   \restoregeometry
+#   \newpage
+# }
+
+# \AtEndDocument{%
+#   \newpage
+#   \thispagestyle{empty}
+#   \newgeometry{margin=0mm}
+#   \includegraphics[width=\paperwidth,height=\paperheight,keepaspectratio=false]{back-cover-1.png}
+#   \thispagestyle{empty}
+#   \includegraphics[width=\paperwidth,height=\paperheight,keepaspectratio=false]{back-cover.png}
+#   \restoregeometry
+# }
+# EOF
 
             # Prepare latex helpers and optionally include back cover if present and is .jpg or .png
             if [ -n "$BACK_COVER_IMAGE" ] && [ -f "$BACK_COVER_IMAGE" ] && [[ "$BACK_COVER_IMAGE" == *.jpg || "$BACK_COVER_IMAGE" == *.png ]]; then
@@ -1746,17 +1827,15 @@ EOF
                 fi
             fi
 
-            cat << EOF > "$EXPORTS_DIR/back-cover.tex"
-\usepackage{pdfpages}
+#             cat << EOF > "$EXPORTS_DIR/back-cover.tex"
+# \usepackage{pdfpages}
 
-\AtEndDocument{%
-  \includepdf[pages=-,scale=1.2]{$EXPORTS_DIR/back-cover.pdf}
-}
-EOF
+# \AtEndDocument{%
+#   \includepdf[pages=-,scale=1]{back-cover.pdf}
+# }
+# EOF
 
-                # -H back-cover.tex \
-
-                cat << 'EOF' > "$EXPORTS_DIR/titles.tex"
+            cat << 'EOF' > "$EXPORTS_DIR/titles.tex"
 \renewcommand{\maketitle}{}
 \usepackage{titlesec}
 \usepackage{tocloft}
@@ -1770,6 +1849,7 @@ EOF
 EOF
 
             # -H cover.tex \
+            # -H back-cover.tex \
             # Try direct PDF generation first (run lualatex non-interactively to avoid hangs)
             (cd "$output_dir" && pandoc -f markdown -t pdf \
                 --pdf-engine=lualatex \
@@ -1777,7 +1857,6 @@ EOF
                 --pdf-engine-opt='-halt-on-error' \
                 --metadata-file="$(basename "$metadata")" \
                 -H titles.tex \
-                -H back-cover.tex \
                 -o "$(basename "$output_file")" "$(basename "$input_file")") && {
                 echo "✅ PDF created: $(basename "$output_file")"
                 return 0

@@ -2106,6 +2106,7 @@ OUTPUT:
 - **Clarity:** Ensure that all explanations are clear and accessible, avoiding jargon where possible.
 - **Chapter Length:** Strive for $MIN_WORDS-$MAX_WORDS words. IMPORTANT: The chapter needs to be $MIN_WORDS words at a minimum.
 - **Final Output Only:** Return only the narrative content.
+- **No Emojis:** Do not include ANY emojis in the text.
 - **Start with:**
 # Chapter ${CHAPTER_NUM}
 ## ${CHAPTER_TITLE}"

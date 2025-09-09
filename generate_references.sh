@@ -12,6 +12,7 @@ COOLDOWN_BASE=${COOLDOWN_BASE:-60}   # base seconds
 COOLDOWN_JITTER=${COOLDOWN_JITTER:-10} # random jitter max
 MAX_RETRIES=${MAX_RETRIES:-2}
 
+MAX_TOKENS=65000
 SOURCES_DIR="$BOOK_DIR/sources"
 TEMP_DIR="$BOOK_DIR/temp_refs"
 SEEN_DIR="$TEMP_DIR/seen"
@@ -184,24 +185,73 @@ total=${#chapter_files[@]}
 log "Found $total chapters (numerically ordered); batch size $BATCH_SIZE"
 
 # Determine resume index from existing per-chapter source files.
-# Find the highest index in chapter_files that already has a corresponding
-# "$SOURCES_DIR/<chapter_basename>_sources.json" and start at the next one.
+# Find the lowest chapter index that doesn't have a corresponding source file.
 # Determine START_CHAPTER from existing per-chapter sources files if not set.
-# We prefer resuming based on generated sources: look for "$SOURCES_DIR/<chapter_basename>_sources.json".
 if [ -z "${START_CHAPTER:-}" ]; then
   START_CHAPTER=1
+  
+  # Check if any source files exist
   if compgen -G "${BOOK_DIR}/sources/chapter_*.md_sources.json" > /dev/null 2>&1; then
-    max=0
+    # Find which chapters already have source files
+    existing_chapters=()
+    missing_chapters=()
+    
+    # First identify chapter numbers from the original chapter files
+    all_chapter_nums=()
+    for f in "${chapter_files[@]}"; do
+      base=$(basename "$f")
+      num=$(echo "$base" | sed -E 's/[^0-9]*([0-9]+).*/\1/')
+      if printf '%s' "$num" | grep -qE '^[0-9]+$'; then
+        all_chapter_nums+=("$num")
+      fi
+    done
+    
+    # Then identify chapters that have source files
     for f in "${BOOK_DIR}"/sources/chapter_*.md_sources.json; do
       base=$(basename "$f")
       num=$(echo "$base" | sed -E 's/chapter_([0-9]+)\.md_sources\.json/\1/')
       if [[ "$num" =~ ^[0-9]+$ ]]; then
+        existing_chapters+=("$num")
+      fi
+    done
+    
+    # Find lowest missing chapter number
+    for num in "${all_chapter_nums[@]}"; do
+      found=false
+      for enum in "${existing_chapters[@]}"; do
+        if [ "$num" -eq "$enum" ]; then
+          found=true
+          break
+        fi
+      done
+      if [ "$found" = false ]; then
+        missing_chapters+=("$num")
+      fi
+    done
+    
+    # Sort missing chapters to find the lowest
+    if [ ${#missing_chapters[@]} -gt 0 ]; then
+      # Create a temporary file for sorting
+      SORT_TMP=$(mktemp)
+      for num in "${missing_chapters[@]}"; do
+        echo "$num"
+      done | sort -n > "$SORT_TMP"
+      
+      # Get the lowest missing chapter
+      lowest_missing=$(head -n 1 "$SORT_TMP")
+      rm -f "$SORT_TMP"
+      
+      if [ -n "$lowest_missing" ]; then
+        START_CHAPTER=$lowest_missing
+      fi
+    else
+      # All chapters have source files, start after the highest
+      max=0
+      for num in "${existing_chapters[@]}"; do
         if [ "$num" -gt "$max" ]; then
           max=$num
         fi
-      fi
-    done
-    if [ $max -gt 0 ]; then
+      done
       START_CHAPTER=$((max + 1))
     fi
   fi
@@ -247,7 +297,7 @@ while [ $i -lt $total ]; do
 
   # Call smart_api_call (multi-provider helper is required)
   log "Calling smart_api_call for batch"
-  if ! smart_api_call "$PROMPT" "" "general" 0.2 8192 $MAX_RETRIES "" > "$RAW_OUT" 2>/dev/null; then
+  if ! smart_api_call "$PROMPT" "" "general" 0.2 $MAX_TOKENS $MAX_RETRIES "" > "$RAW_OUT" 2>/dev/null; then
     log "smart_api_call failed for batch; saving raw output"
     cp "$RAW_OUT" "$SOURCES_DIR/batch_error_$(date +%s).txt" || true
     random_sleep
@@ -276,7 +326,7 @@ while [ $i -lt $total ]; do
           SINGLE_PROMPT=$(generate_prompt_for_batch "$BOOK_DIR/$safe")
           SINGLE_OUT="$TEMP_DIR/raw_retry_${safe}_$(date +%s).txt"
           # retry using smart_api_call
-          if ! smart_api_call "$SINGLE_PROMPT" "" "general" 0.2 8192 $MAX_RETRIES "" > "$SINGLE_OUT" 2>/dev/null; then
+          if ! smart_api_call "$SINGLE_PROMPT" "" "general" 0.2 $MAX_TOKENS $MAX_RETRIES "" > "$SINGLE_OUT" 2>/dev/null; then
             log "smart_api_call retry failed for $safe (attempt $attempt)"
           fi
           # try to extract JSON
@@ -306,16 +356,75 @@ while [ $i -lt $total ]; do
     log "Invalid JSON from Gemini; saving raw to $SOURCES_DIR"
     cp "$RAW_OUT" "$SOURCES_DIR/raw_invalid_$(date +%s).txt"
   fi
-
-  # cooldown with jitter
-  random_sleep
 done
+
+# Check for any missing chapter source files and retry them before final consolidation
+check_missing_sources() {
+  local missing_chapters=()
+  log "Checking for missing source files..."
+  
+  for chap_file in "${chapter_files[@]}"; do
+    base=$(basename "$chap_file")
+    if [ ! -f "$SOURCES_DIR/${base}_sources.json" ]; then
+      log "Found missing source file for $base"
+      missing_chapters+=("$chap_file")
+    fi
+  done
+  
+  if [ ${#missing_chapters[@]} -gt 0 ]; then
+    log "Retrying ${#missing_chapters[@]} missing chapters before consolidation"
+    
+    # Process each missing chapter individually
+    for f in "${missing_chapters[@]}"; do
+      base=$(basename "$f")
+      log "Retrying missing chapter: $base"
+      
+      # Generate prompt for single chapter
+      SINGLE_PROMPT=$(generate_prompt_for_batch "$f")
+      SINGLE_OUT="$TEMP_DIR/raw_missing_${base}_$(date +%s).txt"
+      
+      # Call API
+      if ! smart_api_call "$SINGLE_PROMPT" "" "general" 0.2 $MAX_TOKENS $MAX_RETRIES "" > "$SINGLE_OUT" 2>/dev/null; then
+        log "smart_api_call failed for missing chapter $base"
+        continue
+      fi
+      
+      # Extract JSON
+      SINGLE_JSON="$TEMP_DIR/parsed_missing_${base}_$(date +%s).json"
+      extract_json_block "$SINGLE_OUT" "$SINGLE_JSON"
+      
+      if jq -e . "$SINGLE_JSON" >/dev/null 2>&1; then
+        # Get the chapter data and write to sources
+        chap=$(jq -c '.chapters[0]' "$SINGLE_JSON" 2>/dev/null)
+        if [ -n "$chap" ]; then
+          out="$SOURCES_DIR/${base}_sources.json"
+          echo "$chap" | jq '.' > "$out"
+          src_count=$(echo "$chap" | jq '.sources | length' 2>/dev/null || echo 0)
+          log "Wrote sources for missing $base -> $out (sources: ${src_count:-0})"
+          # Merge into seen index
+          merge_into_seen "$out"
+        fi
+      else
+        log "Invalid JSON from retrying missing chapter $base"
+      fi
+      
+      # Cooldown between chapters
+      random_sleep
+    done
+  else
+    log "No missing source files detected"
+  fi
+}
+
+# Run check for missing chapters before final consolidation
+check_missing_sources
 
 # Consolidate seen files into final bibliography markdown
 log "Consolidating seen sources into $FINAL_MD"
 cat > "$FINAL_MD" <<EOF
-
+## Citations
 EOF
+
 count=0
 for f in "$SEEN_DIR"/*.json; do
   [ -f "$f" ] || continue
@@ -333,21 +442,24 @@ for f in "$SEEN_DIR"/*.json; do
   summary=$(jq -r '.summary // empty' "$f")
 
   echo "#### $count. $title" >> "$FINAL_MD"
-  [ -n "$authors" ] && echo "- **Authors:** $authors" >> "$FINAL_MD"
-  [ -n "$pub" ] && echo "- **Publisher:** $pub" >> "$FINAL_MD"
-  [ -n "$datep" ] && echo "- **Date:** $datep" >> "$FINAL_MD"
-  [ -n "$url" ] && echo "- **URL:** $url" >> "$FINAL_MD"
-  [ -n "$doi" ] && [ "$doi" != "n/a" ] && [ "$doi" != "N/A" ] && [ "$doi" != "" ] && echo "- **DOI:** $doi" >> "$FINAL_MD"
-#   [ -n "$summary" ] && echo "- **Summary:** $summary" >> "$FINAL_MD"
-  if [ -n "$apa" ] || [ -n "$mla" ]; then
-    echo "- **Citations:**" >> "$FINAL_MD"
-    [ -n "$apa" ] && echo "  - APA: $apa" >> "$FINAL_MD"
-    [ -n "$mla" ] && echo "  - MLA: $mla" >> "$FINAL_MD"
-  fi
+  [ -n "$mla" ] && echo "  - $mla" >> "$FINAL_MD"
+
+#   [ -n "$authors" ] && echo "- **Authors:** $authors" >> "$FINAL_MD"
+#   [ -n "$pub" ] && echo "- **Publisher:** $pub" >> "$FINAL_MD"
+#   [ -n "$datep" ] && echo "- **Date:** $datep" >> "$FINAL_MD"
+#   [ -n "$url" ] && echo "- **URL:** $url" >> "$FINAL_MD"
+#   [ -n "$doi" ] && [ "$doi" != "n/a" ] && [ "$doi" != "N/A" ] && [ "$doi" != "" ] && echo "- **DOI:** $doi" >> "$FINAL_MD"
+# #   [ -n "$summary" ] && echo "- **Summary:** $summary" >> "$FINAL_MD"
+#   if [ -n "$apa" ] || [ -n "$mla" ]; then
+#     echo "- **Citations:**" >> "$FINAL_MD"
+#     [ -n "$apa" ] && echo "  - APA: $apa" >> "$FINAL_MD"
+#     [ -n "$mla" ] && echo "  - MLA: $mla" >> "$FINAL_MD"
+#   fi
   echo "" >> "$FINAL_MD"
-  echo "---" >> "$FINAL_MD"
-  echo "" >> "$FINAL_MD"
+  
 done
+
+echo "---" >> "$FINAL_MD"
 
 log "Final bibliography written to $FINAL_MD (sources: $count)"
 exit 0

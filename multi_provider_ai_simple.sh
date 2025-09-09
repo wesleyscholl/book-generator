@@ -251,8 +251,8 @@ GEMINI_MODELS=(
     # "gemini-2.5-pro:5:250000:100"
     
     "gemini-2.5-flash:10:250000:250"
-    "gemini-2.5-flash-lite:15:250000:1000"
     "gemini-2.0-flash:15:1000000:200"
+    "gemini-2.5-flash-lite:15:250000:1000"
     "gemini-2.0-flash-lite:30:1000000:200"
 
     "gemini-1.5-flash:10:250000:250"

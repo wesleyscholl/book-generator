@@ -2821,3 +2821,4 @@ DEBUG: call_ollama_api started with prompt length: 9628, system_prompt length: 9
 DEBUG: Using model: , temperature: 0.7, max_tokens: 947, ctx: 4096
 DEBUG: Using formatted prompt length: 9758
 DEBUG: About to make curl request to Ollama
+DEBUG: call_ollama_api started with prompt length: 884, system_prompt length: 0
