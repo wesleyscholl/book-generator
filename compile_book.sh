@@ -1414,9 +1414,7 @@ fi
 
 cat << EOF >> "$MANUSCRIPT_FILE"
 \pagebreak
-\begin{center}
-\section{References}
-\end{center}
+\newpage
 
 ::: {.pagebreak}
 :::
