@@ -141,6 +141,7 @@ author: "$AUTHOR"
 rights: "Copyright © $PUBLICATION_YEAR $AUTHOR"
 language: "en-US"
 publisher: "$PUBLISHER"
+toc-title: "Table of Contents"
 papersize: 6in,9in
 geometry: "top=2in, bottom=2in, inner=2in, outer=2in"
 identifier:
@@ -167,7 +168,7 @@ generate_author_pen_name() {
     
     # Use a predefined list of creative pen names
     local pen_names=(
-        # "Elara Morgan"
+        "Elara Morgan"
         # "J.T. Blackwood"
         # "Sophia Wyndham"
         # "Xavier Stone"
@@ -175,7 +176,7 @@ generate_author_pen_name() {
         # "Isabella Quinn"
         # "Nathaniel Grey"
         # "Olivia Sterling"
-        "Liam West"
+        # "Liam West"
         # "Mia Rivers"
         # "Noah Bennett"
         # "Ava Sinclair"
@@ -985,34 +986,10 @@ SUB_TITLE=$(head -n 2 "$OUTLINE_FILE" | tail -n 1 | sed 's/^## //; s/^SUBTITLE:[
 # Extract keywords for layout
 # KEYWORDS=$(head -n 3 "$OUTLINE_FILE" | tail -n 1 | sed 's/^## //; s/^KEYWORDS:[[:space:]]*//' | tr -d '\r')
 
-# $BOOK_TITLE
-
-
-# date: "$PUBLICATION_YEAR"
-# Start manuscript with complete front matter using markdown and LaTeX page breaks
-
-# ---
-# title: "$BOOK_TITLE"
-# subtitle: "$SUB_TITLE"
-# author: "$AUTHOR"
-# rights: "Copyright © $PUBLICATION_YEAR $AUTHOR"
-# language: "en-US"
-# publisher: "$PUBLISHER"
-# description: "$DESCRIPTION"
-# subject: ""
-# toc-title: "Table of Contents"
-# header-includes:
-#   - \usepackage{titlesec}
-#   - \titleformat{\section}[block]{\bfseries\Huge\centering}{}{0pt}{}
-#   - \titleformat{\subsection}[block]{\bfseries\Large\centering}{}{0pt}{}
-# ---
-
-## $SUB_TITLE 
-### By $AUTHOR
-#### Copyright © $PUBLICATION_YEAR
-
 cat << EOF > "$MANUSCRIPT_FILE"
-
+<!-- EPUB_ONLY_BEGIN -->
+# $BOOK_TITLE {.unnumbered .unlisted}
+<!-- EPUB_ONLY_END -->
 \renewcommand{\contentsname}{\Huge Table of Contents}
 \thispagestyle{empty}
 \newpage
@@ -1044,10 +1021,13 @@ $(if [ -f "$EXPORTS_DIR/$ICON_BASENAME" ]; then echo "![]($ICON_BASENAME){ width
 {\fontsize{14}{16}\selectfont\bfseries Copyright © $PUBLICATION_YEAR}
 \end{center}
 
-## $SUB_TITLE
-### By $AUTHOR
-#### Copyright © $PUBLICATION_YEAR
+<!-- EPUB_ONLY_BEGIN -->
+## $SUB_TITLE {.unnumbered .unlisted}
+### By $AUTHOR {.unnumbered .unlisted}
+#### Copyright © $PUBLICATION_YEAR {.unnumbered .unlisted}
+<!-- EPUB_ONLY_END -->
 
+\centering
 \centering
 ::: {.logo}
 $(if [ -f "$EXPORTS_DIR/playfulpath.png" ]; then echo "![](playfulpath.png){ width=40% } "; fi)
@@ -1083,13 +1063,17 @@ All rights reserved. No part of this publication may be reproduced, distributed,
 :::
 
 \newpage
-
 \clearpage
 
 \setcounter{tocdepth}{2}
 \tableofcontents
-\newpage
 
+\newpage
+\clearpage
+\pagebreak
+\newpage
+\clearpage\vspace*{\fill}
+\pagestyle{empty}
 \clearpage
 
 ::: {.pagebreak}
@@ -1265,10 +1249,9 @@ for CHAPTER_FILE in "${CHAPTER_FILES[@]}"; do
 done
 
 # Function: insert extra sections (epilogue, glossary, discussion, appendices)
-# "thank-you-readers.md"
 insert_extra_sections() {
     local base_dir="$BOOK_DIR"
-    local files=("epilogue.md" "glossary.md" "discussion.md" "appendices.md" "further-reading.md" "endnotes.md")
+    local files=("epilogue.md" "thank-you-readers.md" "glossary.md" "discussion.md" "appendices.md" "further-reading.md" "endnotes.md")
     for f in "${files[@]}"; do
         path="$base_dir/$f"
         if [ -f "$path" ]; then
@@ -1446,29 +1429,34 @@ cat << EOF >> "$MANUSCRIPT_FILE"
 \pagebreak
 \newpage
 
+::: {.centered}
 ## About the Author
+::: 
 EOF
 
 # Insert image using raw LaTeX if it exists
 if [ -f "$AUTHOR_PHOTO_BASENAME" ]; then
   cat << EOF >> "$MANUSCRIPT_FILE"
 
+::: {.centered}
 $(if [ -f "$EXPORTS_DIR/$AUTHOR_PHOTO_BASENAME" ]; then echo "![]($AUTHOR_PHOTO_BASENAME){ width=50% } "; fi)
-
+:::
 
 EOF
 fi
+
+# Liam West is a digital strategist, entrepreneur, and creator who has helped countless individuals and brands harness the power of micro-influence to grow their presence and monetize their passions. With years of experience navigating the ever-evolving landscape of social media and online business, Liam specializes in breaking down complex strategies into simple, actionable steps that anyone can follow.
+
+# Through his work, Liam has guided aspiring creators, small business owners, and niche influencers to build authentic brands, cultivate engaged communities, and create sustainable income streams online. His mission is to empower everyday people to realize that influence isn't about millions of followers—it's about making a meaningful impact within your niche.
+
+# When he's not writing, speaking, or coaching, Liam enjoys exploring new cities, sipping fine coffee, and finding inspiration in the stories of creators worldwide.
+
 # \includegraphics[width=0.5\\textwidth]{$AUTHOR_PHOTO_BASENAME}
-# Elara Morgan is a passionate non-fiction author who explores the intricacies of human experience and the world around us. With a gift for making complex topics accessible, she bridges the gap between academic research and everyday life, empowering readers with knowledge that is both insightful and practical. Drawing on her background in education and the humanities, she distills ideas into engaging narratives that resonate widely. Her books are praised for their clarity, warmth, and thoughtful challenges to conventional wisdom. Beyond writing, Elara finds inspiration in nature—hiking New Hampshire's trails, tending her garden, and cherishing family time in Portsmouth. These pursuits ground her while fueling her creativity, making her life and work a testament to curiosity and the joy of discovery.
 
 cat << EOF >> "$MANUSCRIPT_FILE"
 \vspace{1cm}
 
-Liam West is a digital strategist, entrepreneur, and creator who has helped countless individuals and brands harness the power of micro-influence to grow their presence and monetize their passions. With years of experience navigating the ever-evolving landscape of social media and online business, Liam specializes in breaking down complex strategies into simple, actionable steps that anyone can follow.
-
-Through his work, Liam has guided aspiring creators, small business owners, and niche influencers to build authentic brands, cultivate engaged communities, and create sustainable income streams online. His mission is to empower everyday people to realize that influence isn't about millions of followers—it's about making a meaningful impact within your niche.
-
-When he's not writing, speaking, or coaching, Liam enjoys exploring new cities, sipping fine coffee, and finding inspiration in the stories of creators worldwide.
+Elara Morgan is a passionate non-fiction author who explores the intricacies of human experience and the world around us. With a gift for making complex topics accessible, she bridges the gap between academic research and everyday life, empowering readers with knowledge that is both insightful and practical. Drawing on her background in education and the humanities, she distills ideas into engaging narratives that resonate widely. Her books are praised for their clarity, warmth, and thoughtful challenges to conventional wisdom. Beyond writing, Elara finds inspiration in nature—hiking New Hampshire's trails, tending her garden, and cherishing family time in Portsmouth. These pursuits ground her while fueling her creativity, making her life and work a testament to curiosity and the joy of discovery.
 
 \vspace{2cm}
 
@@ -1505,9 +1493,25 @@ All intellectual property rights, including copyrights, in this book are owned b
 ::: {.pagebreak}
 :::
 
-![](back-cover-1.png)
+<!-- LaTeX/PDF only - back covers -->
+\pagenumbering{gobble}
+\newgeometry{margin=0mm,top=0mm,bottom=0mm,left=0mm,right=0mm}
+\begin{center}
+\includegraphics[width=\paperwidth,height=\paperheight,keepaspectratio=false]{back-cover-1.png}
+\includegraphics[width=\paperwidth,height=\paperheight,keepaspectratio=false]{back-cover.png}
+\end{center}
+\restoregeometry
 
-![](back-cover.png)
+<!-- EPUB_ONLY_BEGIN -->
+<div class="backcover-container">
+![](back-cover-1.png){width=100% height=100vh}
+</div>
+
+<div class="backcover-container">
+![](back-cover.png){width=100% height=100vh}
+</div>
+<!-- EPUB_ONLY_END -->
+
 EOF
 
 # If a back cover was generated, include it as the final page
@@ -1539,6 +1543,26 @@ echo "📄 Estimated pages: $((TOTAL_WORDS / 250))"
 
 # Define CSS for HTML and EPUB formats
 BOOK_CSS="
+@page {
+  margin: 0;
+  padding: 0;
+}
+
+@page :right {
+  margin: 0;
+}
+
+@page :left {
+  margin: 0;
+}
+
+/* Special page rules for back covers */
+@page backcover {
+  margin: 0;
+  padding: 0;
+  size: 100% 100%;
+}
+
 body { 
   font-family: 'Palatino', 'Georgia', serif; 
   line-height: 1.6;
@@ -1634,6 +1658,8 @@ p {
   margin: 10% auto;
   font-size: 0.9em;
   line-height: 1.5;
+  font-family: serif;
+  margin-top: 2em;
 }
 #TOC ol ol {
   list-style-type: none;
@@ -1644,13 +1670,6 @@ p {
 }
 .fillspace {
   height: 20vh; /* 20% of viewport height */
-}
-.copyright {
-  text-align: center;
-  font-family: serif;         /* matches LaTeX serif fonts */
-  font-size: 0.9em;
-  line-height: 1.5;
-  margin-top: 2em;
 }
 .copyright strong {
   font-weight: bold;
@@ -1665,6 +1684,70 @@ span.copyright-notice {
 .centered {
   text-align: center;
 }
+/* Back cover styles with maximum compatibility for EPUB readers */
+
+.backcover-container {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100vh;
+  max-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.backcover-container img {
+  width: 100% !important;
+  height: 100vh !important;
+  object-fit: cover !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: block !important;
+}
+
+/* Fix image display in various EPUB readers */
+img[src$="back-cover-1.png"], img[src$="back-cover.png"] {
+  width: 100% !important;
+  height: 100vh !important;
+  object-fit: contain !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: block !important;
+}
+
+/* Legacy support classes */
+.fullpage-container {
+  display: block;
+  width: 100%;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+
+.fullpage-container img {
+  display: block;
+  width: 100% !important;
+  height: 100vh !important;
+  max-width: 100% !important;
+  max-height: 100vh !important;
+  object-fit: contain;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+img.fullpage {
+  display: block;
+  width: 100% !important;
+  height: 100vh !important;
+  max-width: 100% !important;
+  max-height: 100vh !important;
+  object-fit: contain;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+p img.fullpage { display: block; }
 "
 
 # Create a CSS file for styling
@@ -1712,16 +1795,41 @@ generate_ebook_format() {
             metadata_basename="$(basename "$metadata")"
             cover_basename=""
             [ -n "$cover" ] && cover_basename="$(basename "$cover")"
+            
+            # Create a temporary EPUB-specific version of the manuscript that:
+            # 1. Shows EPUB_ONLY blocks for EPUB
+            # 2. Hides PDF_ONLY blocks for EPUB
+            epub_tmp_input="${output_dir}/$(basename "$input_file" .md)_epub.md"
+            cp "$input_file" "$epub_tmp_input"
 
-                        # # Prepare a temporary back-cover markdown file if a back cover image exists in the output dir
-                        # back_md=""
-                        # if [ -n "$BACK_COVER_IMAGE" ] && [ -f "$output_dir/$(basename "$BACK_COVER_IMAGE")" ]; then
-                        #         back_basename="$(basename "$BACK_COVER_IMAGE")"
-                        #         back_md="$output_dir/_backcover_insert.md"
-                        #         if [ ! -f "$back_md" ]; then
-                        #                 printf "\n\n![](%s)\n" "$back_basename" > "$back_md"
-                        #         fi
-                        # fi
+            # Process the EPUB_ONLY blocks in the manuscript with sed - keep what's between EPUB_ONLY tags
+            # but remove PDF_ONLY blocks
+            sed -i.bak '
+                /<!-- EPUB_ONLY_BEGIN -->/,/<!-- EPUB_ONLY_END -->/!b  
+                /<!-- EPUB_ONLY_BEGIN -->/d  
+                /<!-- EPUB_ONLY_END -->/d
+            ' "$epub_tmp_input" 2>/dev/null || true
+
+            # Update input_basename to use the EPUB-specific version
+            if [ -f "$epub_tmp_input" ]; then
+                input_basename="$(basename "$epub_tmp_input")"
+            fi
+
+            # Add {.unlisted .unnumbered} to H1 book title in the first 5 pages to avoid TOC epub issues
+            sed -i.bak '2,5s/^# \(.*\)/# \1 {.unlisted .unnumbered}/' "$epub_tmp_input" 2>/dev/null || true
+            # Echo any # or H1 titles in the first 5 pages for debugging
+            echo "Debug: H1 titles in the first 5 pages of EPUB input:"
+            grep -E '^# ' "$epub_tmp_input" | head -n 30
+
+            # Prepare a temporary back-cover markdown file if a back cover image exists in the output dir
+            # back_md=""
+            # if [ -n "$BACK_COVER_IMAGE" ] && [ -f "$output_dir/$(basename "$BACK_COVER_IMAGE")" ]; then
+            #         back_basename="$(basename "$BACK_COVER_IMAGE")"
+            #         back_md="$output_dir/_backcover_insert.md"
+            #         if [ ! -f "$back_md" ]; then
+            #                 printf "\n\n![](%s)\n" "$back_basename" > "$back_md"
+            #         fi
+            # fi
 
 
             # Run pandoc from the output directory so image paths resolve correctly. Use --toc and set chapter level
@@ -1734,7 +1842,7 @@ generate_ebook_format() {
                             --metadata-file="$metadata_basename" \
                             --toc --toc-depth=2 --resource-path=. \
                             --epub-chapter-level=1 --epub-title-page=true \
-                            --split-level=1 -o "$(basename "$output_file")" "$input_basename" "$(basename "$back_md")"
+                            --split-level=1 -o "$(basename "$output_file")" "$input_basename"
                     else
                         pandoc -f markdown -t epub3 \
                             --epub-cover-image="$COVER1_BASENAME" \
@@ -1751,7 +1859,7 @@ generate_ebook_format() {
                             --metadata-file="$metadata_basename" \
                             --toc --toc-depth=2 --resource-path=. \
                             --epub-chapter-level=1 --epub-title-page=true \
-                            --split-level=1 -o "$(basename "$output_file")" "$input_basename" "$(basename "$back_md")"
+                            --split-level=1 -o "$(basename "$output_file")" "$input_basename"
                     else
                         pandoc -f markdown -t epub3 \
                             --css="$css_basename" \
@@ -1772,6 +1880,16 @@ generate_ebook_format() {
             echo "📄 Generating PDF format..."
             cover="$COVER_IMAGE"
             echo "$COVER_IMAGE"
+
+            # Create a PDF-specific version that removes EPUB_ONLY blocks
+            pdf_tmp_input="${output_dir}/$(basename "$input_file" .md)_pdf.md"
+            cp "$input_file" "$pdf_tmp_input"
+
+            # Remove EPUB_ONLY blocks with sed
+            sed -i.bak '/<!-- EPUB_ONLY_BEGIN -->/,/<!-- EPUB_ONLY_END -->/d' "$pdf_tmp_input" 2>/dev/null || true
+            
+            # Use PDF-specific input file
+            input_file="$pdf_tmp_input"
 #             cat << 'EOF' > "$EXPORTS_DIR/cover.tex"
 # \def\cover{$cover}
 # \usepackage{graphicx}
