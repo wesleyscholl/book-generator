@@ -1,0 +1,55 @@
+keyword,search_volume,low_competition_books,dead_books,total_results,books_match_search,pages_scraped,authority_figures,opportunity_score
+[0;34m
+🔍 COMPREHENSIVE ANALYSIS: 'tea ceremony'[0m
+[0;34m--------------------------------------------------[0m
+[0;32m✅ Completed: tea ceremony[0m
+[0;36m   📈 Volume: 4702[0m
+[0;36m   🏆 Score: [1;33m   🧮 Calculating opportunity score:[0m
+[0;32m     ✅ High search volume (4702 > 3000)[0m
+[0;32m     ✅ Enough low competition books (16 ≥ 3)[0m
+[0;32m     ✅ Many dead books (15 ≥ 6)[0m
+[0;32m     ✅ Low competition in search results (3079 < 10000)[0m
+[0;31m     ❌ Poor search term match (54% ≤ 60%)[0m
+[0;32m     ✅ Optimal pages analyzed (3 pages)[0m
+[0;31m     ❌ Too many authority figures (7 ≥ 4)[0m
+[0;36m   📊 Final opportunity score: 5/7[0m
+5/7[0m
+[0;36m   📊 Results: 3079[0m
+[0;36m   📚 Low Competition: 16[0m
+tea ceremony,4702,16,15,3079,26,3,7,0
+[0;34m
+🔍 COMPREHENSIVE ANALYSIS: 'ChatGPT beginners'[0m
+[0;34m--------------------------------------------------[0m
+[0;32m✅ Completed: ChatGPT beginners[0m
+[0;36m   📈 Volume: 3832[0m
+[0;36m   🏆 Score: [1;33m   🧮 Calculating opportunity score:[0m
+[0;32m     ✅ High search volume (3832 > 3000)[0m
+[0;32m     ✅ Enough low competition books (12 ≥ 3)[0m
+[0;32m     ✅ Many dead books (14 ≥ 6)[0m
+[0;32m     ✅ Low competition in search results (5496 < 10000)[0m
+[0;31m     ❌ Poor search term match (53% ≤ 60%)[0m
+[0;32m     ✅ Optimal pages analyzed (3 pages)[0m
+[0;31m     ❌ Too many authority figures (5 ≥ 4)[0m
+[0;36m   📊 Final opportunity score: 5/7[0m
+5/7[0m
+[0;36m   📊 Results: 5496[0m
+[0;36m   📚 Low Competition: 12[0m
+ChatGPT beginners,3832,12,14,5496,22,3,5,0
+[0;34m
+🔍 COMPREHENSIVE ANALYSIS: 'gardening for beginners'[0m
+[0;34m--------------------------------------------------[0m
+[0;32m✅ Completed: gardening for beginners[0m
+[0;36m   📈 Volume: 4418[0m
+[0;36m   🏆 Score: [1;33m   🧮 Calculating opportunity score:[0m
+[0;32m     ✅ High search volume (4418 > 3000)[0m
+[0;32m     ✅ Enough low competition books (13 ≥ 3)[0m
+[0;32m     ✅ Many dead books (13 ≥ 6)[0m
+[0;32m     ✅ Low competition in search results (408 < 10000)[0m
+[0;31m     ❌ Poor search term match (51% ≤ 60%)[0m
+[0;32m     ✅ Optimal pages analyzed (3 pages)[0m
+[0;31m     ❌ Too many authority figures (8 ≥ 4)[0m
+[0;36m   📊 Final opportunity score: 5/7[0m
+5/7[0m
+[0;36m   📊 Results: 408[0m
+[0;36m   📚 Low Competition: 13[0m
+gardening for beginners,4418,13,13,408,24,3,8,0
