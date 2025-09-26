@@ -1,4 +1,4 @@
-# 📚 Book-Generator
+# 🤖📚 AI Book Generator
 
 <p>
 	<img src="scripts/covers/front/playful-path-cover.png" alt="The Playful Path" width="260" style="margin-right:18px;" />
