@@ -1,8 +1,8 @@
 # 📚 Book-Generator
 
 <p>
-	<img src="covers/front/playful-path-cover.png" alt="The Playful Path" width="260" style="margin-right:18px;" />
-	<img src="covers/front/micro-influence-cover.png" alt="The Micro-Influence Advantage" width="260" />
+	<img src="scripts/covers/front/playful-path-cover.png" alt="The Playful Path" width="260" style="margin-right:18px;" />
+	<img src="scripts/covers/front/micro-influence-cover.png" alt="The Micro-Influence Advantage" width="260" />
 </p>
 
 ## Automated book authoring, editing and compilation toolkit.
@@ -40,8 +40,8 @@ This repository contains a set of shell scripts and helper tools that together c
 ### 🔗 Amazon Links
 
 <p>
-	<img src="playful-path-images/playful-path-amazon.png" alt="The Playful Path" width="400" style="margin-right:18px;" />
-	<img src="micro-influence-images/micro-influence-amazon.png" alt="The Micro-Influence Advantage" width="400" />
+	<img src="scripts/playful-path-images/playful-path-amazon.png" alt="The Playful Path" width="400" style="margin-right:18px;" />
+	<img src="scripts/micro-influence-images/micro-influence-amazon.png" alt="The Micro-Influence Advantage" width="400" />
 </p>
 
 - The Playful Path — https://a.co/d/hAg2DWe
