@@ -1,6 +1,11 @@
 # 📚 Book-Generator
 
-Automated book authoring, editing and compilation toolkit.
+<p>
+	<img src="covers/front/playful-path-cover.png" alt="The Playful Path" width="260" style="margin-right:18px;" />
+	<img src="covers/front/micro-influence-cover.png" alt="The Micro-Influence Advantage" width="260" />
+</p>
+
+## Automated book authoring, editing and compilation toolkit.
 
 This repository contains a set of shell scripts and helper tools that together can:
 
@@ -32,16 +37,7 @@ This repository contains a set of shell scripts and helper tools that together c
 - The Playful Path: Unlocking Your Child's Potential Through Joyful, Play-Based Learning for Ages 3-8 — https://a.co/d/hAg2DWe
 - The Micro-Influence Advantage: Building Your Niche Brand and Monetizing Your Passion Online — https://a.co/d/3zwHBZJ
 
-### 🎨 Cover Images
-
-Here are the published-book covers:
-
-<p>
-	<img src="covers/front/playful-path-cover.png" alt="The Playful Path" width="260" style="margin-right:18px;" />
-	<img src="covers/front/micro-influence-cover.png" alt="The Micro-Influence Advantage" width="260" />
-</p>
-
-### 🔗 Links
+### 🔗 Amazon Links
 
 <p>
 	<img src="playful-path-images/playful-path-amazon.png" alt="The Playful Path" width="400" style="margin-right:18px;" />
