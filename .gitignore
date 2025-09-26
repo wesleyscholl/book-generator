@@ -9,3 +9,4 @@ v6
 /venv
 .kdp_cache
 files
+.DS_Store

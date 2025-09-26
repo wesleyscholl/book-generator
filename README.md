@@ -14,7 +14,7 @@ This repository contains a set of shell scripts and helper tools that together c
 - Export the final book in EPUB, PDF and other common ebook formats ready for platforms
 	such as Amazon KDP.
 
-✨ Key Points
+### ✨ Key Points
 - Designed to use free tools and services where possible. When AI APIs are used, the
 	project supports Gemini (recommended), Ollama, Groq and OpenAI as configurable
 	providers via environment variables. If you do not set API keys the scripts will
@@ -27,12 +27,12 @@ This repository contains a set of shell scripts and helper tools that together c
 	toolkit to generate and publish two books which passed KDP checks and are live on
 	Amazon. Those books were not marketed — this was an experiment.
 
-🗂️ Published Books
+### 🗂️ Published Books
 
 - The Playful Path: Unlocking Your Child's Potential Through Joyful, Play-Based Learning for Ages 3-8 — https://a.co/d/hAg2DWe
 - The Micro-Influence Advantage: Building Your Niche Brand and Monetizing Your Passion Online — https://a.co/d/3zwHBZJ
 
-🎨 Cover Images
+### 🎨 Cover Images
 
 Here are the published-book covers:
 
@@ -41,7 +41,12 @@ Here are the published-book covers:
 	<img src="covers/front/micro-influence-cover.png" alt="The Micro-Influence Advantage" width="260" />
 </p>
 
-Links
+### 🔗 Links
+
+<p>
+	<img src="playful-path-images/playful-path-amazon.png" alt="The Playful Path" width="300" style="margin-right:18px;" />
+	<img src="micro-influence-images/micro-influence-amazon.png" alt="The Micro-Influence Advantage" width="300" />
+</p>
 
 - The Playful Path — https://a.co/d/hAg2DWe
 - The Micro-Influence Advantage — https://a.co/d/3zwHBZJ
