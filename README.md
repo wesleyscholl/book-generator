@@ -44,8 +44,8 @@ Here are the published-book covers:
 ### 🔗 Links
 
 <p>
-	<img src="playful-path-images/playful-path-amazon.png" alt="The Playful Path" width="300" style="margin-right:18px;" />
-	<img src="micro-influence-images/micro-influence-amazon.png" alt="The Micro-Influence Advantage" width="300" />
+	<img src="playful-path-images/playful-path-amazon.png" alt="The Playful Path" width="350" style="margin-right:18px;" />
+	<img src="micro-influence-images/micro-influence-amazon.png" alt="The Micro-Influence Advantage" width="350" />
 </p>
 
 - The Playful Path — https://a.co/d/hAg2DWe
