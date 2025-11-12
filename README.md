@@ -1,5 +1,7 @@
 # 🤖📚 AI Book Generator
 
+**Status**: Complete autonomous book creation pipeline from concept to publication - generating professional manuscripts with AI-powered authoring and design.
+
 <p>
 	<img src="scripts/covers/front/playful-path-cover.png" alt="The Playful Path" width="260" style="margin-right:18px;" />
 	<img src="scripts/covers/front/micro-influence-cover.png" alt="The Micro-Influence Advantage" width="260" />
